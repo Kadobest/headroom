@@ -201,3 +201,28 @@ create policy "Team can view feedback" on public.feedback for select using (publ
 --  - Feedback can be submitted by anyone with the link (clients
 --    don't need a login), but only your team can read submissions.
 -- ============================================================
+
+-- ============================================================
+-- v5 additions: company/label affiliation for clients & artists,
+-- plus allowing project edits (update policy already covers this
+-- for owners/assistants — no schema change needed there).
+-- ============================================================
+alter table public.clients add column if not exists company text;
+alter table public.artists add column if not exists company text;
+
+-- ============================================================
+-- 9. NEW (v5): Company/label tracking on Clients and Artists.
+--    Lets you record who a person works for, so if that person
+--    leaves, you still have the company/label on file for future work.
+-- ============================================================
+alter table public.clients add column if not exists company_name text;
+alter table public.clients add column if not exists company_type text;
+alter table public.clients drop constraint if exists clients_company_type_check;
+alter table public.clients add constraint clients_company_type_check
+  check (company_type in ('label','company','independent') or company_type is null);
+
+alter table public.artists add column if not exists company_name text;
+alter table public.artists add column if not exists company_type text;
+alter table public.artists drop constraint if exists artists_company_type_check;
+alter table public.artists add constraint artists_company_type_check
+  check (company_type in ('label','company','independent') or company_type is null);
