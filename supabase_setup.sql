@@ -226,3 +226,26 @@ alter table public.artists add column if not exists company_type text;
 alter table public.artists drop constraint if exists artists_company_type_check;
 alter table public.artists add constraint artists_company_type_check
   check (company_type in ('label','company','independent') or company_type is null);
+
+-- ============================================================
+-- 10. NEW (v6): Tasks — a real to-do list across all work streams,
+--    optionally linked to a project.
+-- ============================================================
+create table if not exists public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  stream text,                 -- e.g. "Studio", "Label", "Publishing", "Freelance"
+  project_id uuid references public.projects(id) on delete set null,
+  due_date date,
+  done boolean default false,
+  created_at timestamp with time zone default now()
+);
+alter table public.tasks enable row level security;
+drop policy if exists "Team can view tasks" on public.tasks;
+create policy "Team can view tasks" on public.tasks for select using (public.is_team_member());
+drop policy if exists "Editors can insert tasks" on public.tasks;
+create policy "Editors can insert tasks" on public.tasks for insert with check (public.can_edit());
+drop policy if exists "Editors can update tasks" on public.tasks;
+create policy "Editors can update tasks" on public.tasks for update using (public.can_edit());
+drop policy if exists "Owners can delete tasks" on public.tasks;
+create policy "Owners can delete tasks" on public.tasks for delete using (public.is_owner());

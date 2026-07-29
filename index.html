@@ -880,6 +880,17 @@
     <form id="project-form">
       <div class="login-field"><label>Project title</label><input type="text" id="proj-title" required placeholder="e.g. Wedding Highlight Mix"></div>
       <div class="login-field"><label>Client name</label><input type="text" id="proj-client" required placeholder="e.g. Amani Events"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Client's company / label (optional)</label><input type="text" id="proj-client-company" placeholder="e.g. Brighten Sounds"></div>
+        <div class="login-field"><label>Company type</label>
+          <select id="proj-client-company-type">
+            <option value="">—</option>
+            <option value="label">Label</option>
+            <option value="company">Company</option>
+            <option value="independent">Independent</option>
+          </select>
+        </div>
+      </div>
       <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, Live Event, Voice-over"></div>
       <div class="field-row">
         <div class="login-field"><label>Type</label>
@@ -999,6 +1010,34 @@
       <div class="btn-row">
         <button type="button" class="btn btn-ghost" id="track-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary" id="track-submit">Save track</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Task modal -->
+<div class="data-modal-scrim" id="task-modal-scrim">
+  <div class="data-modal">
+    <h3>Add Task</h3>
+    <form id="task-form">
+      <div class="login-field"><label>Task</label><input type="text" id="task-title" required placeholder="e.g. Send Nomad Films invoice"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Stream</label>
+          <select id="task-stream">
+            <option>Studio</option>
+            <option>Label</option>
+            <option>Publishing</option>
+            <option>Freelance</option>
+          </select>
+        </div>
+        <div class="login-field"><label>Due date (optional)</label><input type="date" id="task-due"></div>
+      </div>
+      <div class="login-field"><label>Link to a project (optional)</label>
+        <select id="task-project"><option value="">— None —</option></select>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="task-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="task-submit">Save task</button>
       </div>
     </form>
   </div>
@@ -1400,8 +1439,9 @@
 
     <!-- ================= TASKS ================= -->
     <div class="view" id="view-tasks">
-      <div class="card">
-        <div class="empty-note">No tasks yet — once this is connected to real data, tasks you add will be saved and checked off here permanently.</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-task-btn">+ Add Task</button></div>
+      <div class="card" id="tasks-card">
+        <div class="empty-note">No tasks yet.</div>
       </div>
     </div>
 
@@ -1979,7 +2019,7 @@
   let editingProjectId = null;
 
   async function loadAllData(){
-    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList()]);
+    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList(), loadTasks()]);
   }
 
   // ---- Projects ----
@@ -2015,19 +2055,38 @@
         <table>
           <tr><th>Project</th><th>Client</th><th>Service</th><th>Type</th><th>Stage</th><th>Due</th><th>Value</th><th>Paid</th></tr>
           ${list.map(p => `
-            <tr class="rowhover" data-project-id="${p.id}" style="cursor:pointer;">
-              <td class="name-cell">${p.title}</td>
+            <tr class="rowhover" data-project-id="${p.id}">
+              <td class="name-cell" style="cursor:pointer;">${p.title}</td>
               <td>${p.client_name || '—'}</td>
               <td>${p.service || '—'}</td>
               <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : 'Studio'}</span></td>
-              <td><span class="pill ${p.stage === 'complete' ? 'paid' : (p.stage === 'received' ? 'signed' : 'active')}">${stageLabel[p.stage]}</span></td>
-              <td>${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
-              <td class="sensitive">${money(p.value)}</td>
-              <td class="sensitive"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
+              <td>
+                <select class="stage-quick-select" data-project-id="${p.id}" style="font-size:11.5px; padding:4px 6px; border-radius:6px; border:1px solid #E3E6EC;">
+                  <option value="received" ${p.stage==='received'?'selected':''}>Received</option>
+                  <option value="in_progress" ${p.stage==='in_progress'?'selected':''}>In Progress</option>
+                  <option value="delivered" ${p.stage==='delivered'?'selected':''}>Delivered</option>
+                  <option value="feedback" ${p.stage==='feedback'?'selected':''}>Feedback</option>
+                  <option value="complete" ${p.stage==='complete'?'selected':''}>Complete</option>
+                </select>
+              </td>
+              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
+              <td class="sensitive" style="cursor:pointer;">${money(p.value)}</td>
+              <td class="sensitive" style="cursor:pointer;"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
             </tr>`).join('')}
         </table>`;
       tableCard.querySelectorAll('tr[data-project-id]').forEach(el=>{
-        el.addEventListener('click', ()=> openProjectForEdit(el.dataset.projectId));
+        el.addEventListener('click', (e)=>{
+          if (e.target.classList.contains('stage-quick-select')) return;
+          openProjectForEdit(el.dataset.projectId);
+        });
+      });
+      tableCard.querySelectorAll('.stage-quick-select').forEach(sel=>{
+        sel.addEventListener('click', (e)=> e.stopPropagation());
+        sel.addEventListener('change', async (e)=>{
+          e.stopPropagation();
+          await supabaseClient.from('projects').update({ stage: sel.value }).eq('id', sel.dataset.projectId);
+          await loadProjects();
+        });
       });
     }
 
@@ -2150,6 +2209,56 @@
     const dashCard = document.querySelectorAll('#view-dashboard .card')[2] || null;
   }
 
+  // ---- Tasks ----
+  async function loadTasks(){
+    const { data } = await supabaseClient
+      .from('tasks')
+      .select('*, projects(title)')
+      .order('done', { ascending: true })
+      .order('due_date', { ascending: true, nullsFirst: false });
+    const list = data || [];
+
+    document.getElementById('nav-count-tasks').textContent = list.filter(t => !t.done).length;
+
+    const card = document.getElementById('tasks-card');
+    if (!list.length){
+      card.innerHTML = '<div class="empty-note">No tasks yet — click "+ Add Task" to add one.</div>';
+      return;
+    }
+    card.innerHTML = `<table>
+      <tr><th></th><th>Task</th><th>Stream</th><th>Project</th><th>Due</th><th></th></tr>
+      ${list.map(t => `
+        <tr class="rowhover">
+          <td><input type="checkbox" class="task-check" data-id="${t.id}" ${t.done ? 'checked' : ''}></td>
+          <td class="name-cell" style="${t.done ? 'text-decoration:line-through; color:#B7BECE;' : ''}">${t.title}</td>
+          <td>${t.stream || '—'}</td>
+          <td class="sub-cell">${t.projects ? t.projects.title : '—'}</td>
+          <td class="sub-cell">${t.due_date ? new Date(t.due_date).toLocaleDateString() : '—'}</td>
+          <td><button class="btn btn-ghost task-delete" data-id="${t.id}" style="padding:4px 8px; font-size:11px;">Remove</button></td>
+        </tr>`).join('')}
+      </table>`;
+
+    card.querySelectorAll('.task-check').forEach(cb=>{
+      cb.addEventListener('change', async ()=>{
+        await supabaseClient.from('tasks').update({ done: cb.checked }).eq('id', cb.dataset.id);
+        await loadTasks();
+      });
+    });
+    card.querySelectorAll('.task-delete').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        await supabaseClient.from('tasks').delete().eq('id', btn.dataset.id);
+        await loadTasks();
+      });
+    });
+  }
+
+  function populateTaskProjectSelect(){
+    const select = document.getElementById('task-project');
+    if (!select) return;
+    select.innerHTML = '<option value="">— None —</option>' +
+      projectsCache.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+  }
+
   function populateFeedbackProjectSelect(projects){
     const select = document.getElementById('feedback-project-select');
     if (!select) return;
@@ -2198,6 +2307,7 @@
   wireModal('client-modal-scrim', 'client-cancel');
   wireModal('artist-modal-scrim', 'artist-cancel');
   wireModal('track-modal-scrim', 'track-cancel');
+  wireModal('task-modal-scrim', 'task-cancel');
   document.getElementById('project-cancel').addEventListener('click', resetProjectModal);
 
   function resetProjectModal(){
@@ -2215,6 +2325,8 @@
     document.getElementById('project-delete').style.display = '';
     document.getElementById('proj-title').value = p.title || '';
     document.getElementById('proj-client').value = p.client_name || '';
+    document.getElementById('proj-client-company').value = '';
+    document.getElementById('proj-client-company-type').value = '';
     document.getElementById('proj-service').value = p.service || '';
     document.getElementById('proj-type').value = p.project_type || 'studio';
     document.getElementById('proj-stage').value = p.stage || 'received';
@@ -2235,6 +2347,11 @@
   if (addArtistBtn) addArtistBtn.addEventListener('click', ()=> document.getElementById('artist-modal-scrim').classList.add('show'));
   const addTrackBtn = document.getElementById('add-track-btn');
   if (addTrackBtn) addTrackBtn.addEventListener('click', ()=> document.getElementById('track-modal-scrim').classList.add('show'));
+  const addTaskBtn = document.getElementById('add-task-btn');
+  if (addTaskBtn) addTaskBtn.addEventListener('click', ()=>{
+    populateTaskProjectSelect();
+    document.getElementById('task-modal-scrim').classList.add('show');
+  });
 
   document.getElementById('project-delete').addEventListener('click', async ()=>{
     if (!editingProjectId) return;
@@ -2249,13 +2366,39 @@
     await loadProjects();
   });
 
+  // Makes sure a client row exists for this project's client name —
+  // creates one if it's new, or fills in company info if it was missing.
+  async function ensureClientExists(name, companyName, companyType){
+    if (!name) return;
+    const { data: existing } = await supabaseClient.from('clients').select('*').ilike('name', name).limit(1);
+    if (existing && existing.length){
+      const c = existing[0];
+      const needsUpdate = (companyName && !c.company_name) || (companyType && !c.company_type);
+      if (needsUpdate){
+        await supabaseClient.from('clients').update({
+          company_name: c.company_name || companyName || null,
+          company_type: c.company_type || companyType || null,
+        }).eq('id', c.id);
+      }
+      return;
+    }
+    await supabaseClient.from('clients').insert({
+      name,
+      company_name: companyName || null,
+      company_type: companyType || null,
+    });
+  }
+
   document.getElementById('project-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const btn = document.getElementById('project-submit');
     btn.disabled = true; btn.textContent = 'Saving…';
+    const clientName = document.getElementById('proj-client').value.trim();
+    const clientCompany = document.getElementById('proj-client-company').value.trim();
+    const clientCompanyType = document.getElementById('proj-client-company-type').value;
     const payload = {
       title: document.getElementById('proj-title').value.trim(),
-      client_name: document.getElementById('proj-client').value.trim(),
+      client_name: clientName,
       service: document.getElementById('proj-service').value.trim(),
       project_type: document.getElementById('proj-type').value,
       stage: document.getElementById('proj-stage').value,
@@ -2267,11 +2410,15 @@
     const { error } = editingProjectId
       ? await supabaseClient.from('projects').update(payload).eq('id', editingProjectId)
       : await supabaseClient.from('projects').insert(payload);
+    if (!error){
+      await ensureClientExists(clientName, clientCompany, clientCompanyType);
+    }
     btn.disabled = false; btn.textContent = 'Save project';
     if (error){ alert(error.message || "Couldn't save this project."); return; }
     document.getElementById('project-modal-scrim').classList.remove('show');
     resetProjectModal();
     await loadProjects();
+    await loadClients();
   });
 
   document.getElementById('client-form').addEventListener('submit', async (e)=>{
@@ -2333,6 +2480,23 @@
     e.target.reset();
     document.getElementById('track-modal-scrim').classList.remove('show');
     await loadTracks();
+  });
+
+  document.getElementById('task-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('task-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await supabaseClient.from('tasks').insert({
+      title: document.getElementById('task-title').value.trim(),
+      stream: document.getElementById('task-stream').value,
+      due_date: document.getElementById('task-due').value || null,
+      project_id: document.getElementById('task-project').value || null,
+    });
+    btn.disabled = false; btn.textContent = 'Save task';
+    if (error){ alert(error.message || "Couldn't save this task."); return; }
+    e.target.reset();
+    document.getElementById('task-modal-scrim').classList.remove('show');
+    await loadTasks();
   });
 
   // =========================================================
