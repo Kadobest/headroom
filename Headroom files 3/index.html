@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Headroom — Studio & Work Management</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B1E3D'/%3E%3Cpath d='M32 16 L48 46 L16 46 Z' fill='%23F2792D'/%3E%3Cpath d='M32 27 L38 38 L26 38 Z' fill='%230B1E3D'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B1E3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Headroom">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B1E3D;
+    --navy-deep:#071528;
+    --navy-mid:#13294F;
+    --orange:#F2792D;
+    --orange-dim:#c96324;
+    --black:#0D0D0D;
+    --white:#FFFFFF;
+    --paper:#F5F6F8;
+    --line:#22385F;
+    --muted:#8FA0C0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--paper);
+    color:var(--black);
+    display:flex;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--orange); color:var(--white);}
+
+  /* ---------- Dark mode ---------- */
+  body.theme-dark{ --paper:#0E1A2E; --white:#152238; --black:#E7ECF5; }
+  body.theme-dark .topbar{ background:#152238; border-color:#22385F; }
+  body.theme-dark .card{ background:#152238; border-color:#22385F; }
+  body.theme-dark table th{ color:#8FA0C0; border-color:#22385F; }
+  body.theme-dark td{ border-color:#22385F; color:#DCE3F0; }
+  body.theme-dark tr.rowhover:hover{ background:#1B2A45; }
+  body.theme-dark .sub-cell{ color:#8FA0C0; }
+  body.theme-dark .name-cell{ color:#EAF0FF; }
+  body.theme-dark .stat-card .value{ color:#EAF0FF; }
+  body.theme-dark .btn-ghost{ border-color:#33507C; color:#DCE3F0; background:transparent; }
+  body.theme-dark .btn-ghost:hover{ background:#1B2A45; }
+  body.theme-dark .stage{ background:#0E1A2E; border-color:#22385F; }
+  body.theme-dark .job{ background:#152238; border-color:#22385F; }
+  body.theme-dark .job:hover{ border-color:#33507C; }
+  body.theme-dark .empty-note{ color:#8FA0C0; }
+  body.theme-dark .account-email, body.theme-dark .topbar h1{ color:#EAF0FF; }
+  body.theme-dark .account-role, body.theme-dark .topbar .sub{ color:#8FA0C0; }
+  body.theme-dark .meta-cell{ background:#152238; }
+  body.theme-dark .meta-grid{ background:#22385F; border-color:#22385F; }
+  body.theme-dark .invoice-doc, body.theme-dark .client-view-frame, body.theme-dark .cvf-body{ background:#152238; border-color:#22385F; color:#DCE3F0; }
+  body.theme-dark .theme-toggle svg{ stroke:var(--navy); }
+  body.theme-dark .theme-toggle .sun{ display:none; }
+  body.theme-dark .theme-toggle .moon{ display:inline-flex; }
+  .theme-toggle .moon{ display:none; }
+  .theme-toggle{
+    width:34px; height:34px; border-radius:6px; border:1px solid #D8DCE6; background:transparent;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .theme-toggle:hover{ background:#F0F2F6; }
+  body.theme-dark .theme-toggle{ border-color:#33507C; }
+  body.theme-dark .theme-toggle:hover{ background:#1B2A45; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:236px;
+    background:var(--navy-deep);
+    color:var(--white);
+    display:flex;
+    flex-direction:column;
+    flex-shrink:0;
+    position:sticky;
+    top:0;
+    height:100vh;
+    border-right:1px solid var(--line);
+    overflow:hidden;
+  }
+  .nav-scroll{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+  }
+  .brand{
+    padding:26px 22px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand .mark{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    letter-spacing:0.01em;
+    display:inline-flex;
+    align-items:baseline;
+  }
+  .brand .tag{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:6px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;
+  }
+
+  /* ---------- Headroom logo mark (icon tile + triangle-A wordmark) ---------- */
+  .hr-icon{
+    width:28px; height:28px; border-radius:7px; background:var(--navy);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    position:relative;
+  }
+  .hr-icon .tri{
+    width:13px; height:10.5px; background:var(--orange);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    position:relative;
+  }
+  .hr-icon .tri::after{
+    content:''; position:absolute; left:50%; top:24%;
+    width:3.6px; height:3px; transform:translate(-50%,0);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    background:var(--navy);
+  }
+  .hr-icon.on-light{ background:var(--navy); }
+
+  .hr-word{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:0.01em;
+    display:inline-flex; align-items:baseline; white-space:nowrap;
+  }
+  .hr-word.on-dark{ color:var(--white); }
+  .hr-word.on-light{ color:var(--navy); }
+  .hr-a{
+    position:relative; display:inline-block;
+    width:0.78em; height:0.74em; margin:0 0.01em;
+    background:var(--orange);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    transform:translateY(0.03em);
+  }
+  .hr-a::after{
+    content:''; position:absolute; left:50%; top:22%;
+    width:0.16em; height:0.14em; transform:translate(-50%,0);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+  }
+  .hr-a.on-light::after{ background:var(--paper); }
+  .hr-a.on-dark::after{ background:var(--navy-deep); }
+  .hr-a.on-white::after{ background:var(--white); }
+
+  .nav-group{
+    padding:16px 12px;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .nav-group .label{
+    font-size:10px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    font-family:'JetBrains Mono',monospace;
+    padding:0 10px 8px;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 10px;
+    border-radius:6px;
+    font-size:13.5px;
+    font-weight:500;
+    color:#C7D2E6;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+    position:relative;
+  }
+  .nav-item:hover{ background:rgba(255,255,255,0.05); color:var(--white); }
+  .nav-item.active{ background:var(--orange); color:var(--white); }
+  .nav-item.active svg{ stroke:var(--white); }
+  .nav-item svg{ width:16px; height:16px; stroke:#8FA0C0; flex-shrink:0; }
+  .nav-item.active svg{ stroke:white; }
+  .nav-item .count{
+    margin-left:auto;
+    font-size:10.5px;
+    font-family:'JetBrains Mono',monospace;
+    color:var(--muted);
+    background:rgba(255,255,255,0.06);
+    padding:1px 6px;
+    border-radius:10px;
+  }
+  .nav-item.active .count{ background:rgba(0,0,0,0.2); color:white; }
+
+  .sidebar-foot{
+    flex-shrink:0;
+    padding:16px 22px;
+    border-top:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .avatar{
+    width:30px;height:30px;border-radius:6px;
+    background:var(--orange);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; color:white;
+    flex-shrink:0;
+    line-height:1;
+  }
+  .sidebar-foot .who{ font-size:12.5px; font-weight:600; }
+  .sidebar-foot .role{ font-size:10.5px; color:var(--muted); }
+
+  /* ---------- Main ---------- */
+  .main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .topbar{
+    height:64px;
+    background:var(--white);
+    border-bottom:1px solid #E3E6EC;
+    display:flex;
+    align-items:center;
+    padding:0 28px;
+    gap:16px;
+    position:sticky; top:0; z-index:5;
+  }
+  .topbar h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px;
+    font-weight:600;
+    letter-spacing:-.01em;
+  }
+  .topbar .sub{ font-size:12px; color:#6B7690; margin-top:1px;}
+  .topbar-right{ margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:8px 14px;
+    border-radius:6px;
+    border:1px solid transparent;
+    cursor:pointer;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{ background:var(--orange); color:white; }
+  .btn-primary:hover{ filter:brightness(1.06); }
+  .btn-ghost{ background:transparent; border-color:#D8DCE6; color:var(--navy); }
+  .btn-ghost:hover{ background:#F0F2F6; }
+
+  .content{ padding:26px 28px 60px; }
+  .view{ display:none; animation:fadein .25s ease; }
+  .view.active{ display:block; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  /* ---------- Cards / grid ---------- */
+  .grid{ display:grid; gap:16px; }
+  .grid-4{ grid-template-columns:repeat(4,1fr); }
+  .grid-3{ grid-template-columns:repeat(3,1fr); }
+  .grid-2{ grid-template-columns:2fr 1fr; }
+  @media(max-width:1100px){ .grid-4{grid-template-columns:repeat(2,1fr);} .grid-2{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--white);
+    border:1px solid #E3E6EC;
+    border-radius:10px;
+    padding:18px;
+  }
+  .card h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .card h3 .more{ font-size:11px; color:var(--orange); font-weight:600; cursor:pointer; }
+
+  .stat-card{ position:relative; overflow:hidden; }
+  .stat-card .label{ font-size:11.5px; color:#6B7690; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .stat-card .value{ font-family:'Space Grotesk',sans-serif; font-size:30px; font-weight:700; margin-top:6px; color:var(--navy); }
+  .stat-card .delta{ font-size:12px; margin-top:6px; font-weight:600; }
+  .delta.up{ color:#1D8A4E; }
+  .delta.warn{ color:var(--orange-dim); }
+  .stat-card .bar{ position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--orange); }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline{ display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; }
+  .stage{
+    flex:1; min-width:190px;
+    background:#F8F9FB;
+    border:1px solid #E3E6EC;
+    border-radius:10px;
+    padding:12px;
+  }
+  .stage-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid var(--stage-color, var(--orange));
+  }
+  .stage-head span.name{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); }
+  .stage-head span.n{ font-family:'JetBrains Mono',monospace; font-size:11px; color:#6B7690; }
+  .job{
+    background:white; border:1px solid #E7E9EF; border-radius:8px;
+    padding:10px; margin-bottom:8px; cursor:pointer;
+    transition:box-shadow .15s, border-color .15s;
+  }
+  .job:hover{ box-shadow:0 3px 10px rgba(11,30,61,0.08); border-color:#CBD3E3; }
+  .job .jtitle{ font-size:12.5px; font-weight:600; color:var(--navy); }
+  .job .jclient{ font-size:11.5px; color:#6B7690; margin-top:2px; }
+  .job .jmeta{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .tag-svc{
+    font-size:9.5px; font-weight:700; padding:2px 6px; border-radius:4px;
+    text-transform:uppercase; letter-spacing:.03em;
+  }
+  .tag-svc.mix{ background:#FDE9D9; color:var(--orange-dim); }
+  .tag-svc.film{ background:#E4E9F5; color:var(--navy); }
+  .tag-svc.voice{ background:#E3F3E9; color:#1D8A4E; }
+  .tag-svc.podcast{ background:#F1E7F7; color:#7B3FA0; }
+  .tag-svc.field{ background:#DFF3F1; color:#137A6F; }
+  .tag-svc.live{ background:#FDEAEA; color:#C3492E; }
+  .tag-svc.jingle{ background:#FFF3D6; color:#9A7514; }
+
+  .track-detail{ display:none; }
+  .track-detail.show-track{ display:block; }
+  .tag-flag{
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    padding:2px 6px; border-radius:4px;
+  }
+  .tag-flag.studio{ background:#E4E9F5; color:var(--navy); }
+  .tag-flag.label{ background:#FDE9D9; color:var(--orange-dim); }
+
+  .pill.free{ background:#EDEFF3; color:#5A6478; }
+  .tag-svc.field{ background:#DCEEF2; color:#1C6E7D; }
+  .tag-svc.live{ background:#0B1E3D; color:#FFD9B3; }
+  .tag-svc.jingle{ background:#FDE7E3; color:#C3492E; }
+  .due{ font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#9AA5BC; }
+
+  /* ---------- Tables ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+    color:#8590A8; padding:8px 10px; border-bottom:1px solid #E3E6EC; font-weight:700;
+  }
+  td{ padding:11px 10px; border-bottom:1px solid #EEF0F4; vertical-align:middle; }
+  tr:last-child td{ border-bottom:none; }
+  tr.rowhover:hover{ background:#FAFBFD; }
+  .name-cell{ font-weight:600; color:var(--navy); }
+  .sub-cell{ font-size:11.5px; color:#8A93AB; }
+  .pill{ font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; display:inline-block; }
+  .pill.paid{ background:#E3F3E9; color:#1D8A4E; }
+  .pill.unpaid{ background:#FDE7E3; color:#C3492E; }
+  .pill.partial{ background:#FDF3D9; color:#9A7514; }
+  .pill.active{ background:#E4E9F5; color:var(--navy); }
+  .pill.signed{ background:#FDE9D9; color:var(--orange-dim); }
+
+  .avatar-sm{
+    width:28px;height:28px;border-radius:6px;background:var(--navy);
+    color:white; display:inline-flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:11px;
+    margin-right:8px; vertical-align:middle;
+  }
+
+  /* ---------- Feedback stars ---------- */
+  .stars{ color:var(--orange); letter-spacing:2px; font-size:13px; }
+  .quote{ font-size:12.5px; color:#4A5470; font-style:italic; margin-top:4px; }
+
+  /* ---------- Calendar mini ---------- */
+  .cal-row{ display:flex; gap:8px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #EEF0F4; }
+  .cal-row:last-child{ border-bottom:none; }
+  .cal-date{
+    width:44px; text-align:center; background:var(--navy); color:white; border-radius:8px; padding:6px 0; flex-shrink:0;
+  }
+  .cal-date .d{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; line-height:1; }
+  .cal-date .m{ font-size:9px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; }
+  .cal-info .t{ font-size:13px; font-weight:600; color:var(--navy); }
+  .cal-info .s{ font-size:11.5px; color:#8A93AB; }
+
+  /* ---------- Metadata grid (Vault) ---------- */
+  .meta-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:#E3E6EC; border:1px solid #E3E6EC; border-radius:8px; overflow:hidden; margin-top:10px;}
+  .meta-cell{ background:white; padding:9px 12px; }
+  .meta-cell .k{ font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:#9AA5BC; font-family:'JetBrains Mono',monospace; }
+  .meta-cell .v{ font-size:12.5px; font-weight:600; color:var(--navy); margin-top:2px; }
+
+  /* Placeholder note banner */
+  .banner{
+    background:var(--navy); color:white; border-radius:10px; padding:14px 18px;
+    display:flex; align-items:center; gap:12px; margin-bottom:20px; font-size:12.5px;
+  }
+  .banner .swatch{ width:8px;height:8px;background:var(--orange); border-radius:2px; flex-shrink:0; }
+  .banner b{ color:var(--orange); }
+
+  .section-title{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; margin:26px 0 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-title::before{ content:''; width:4px; height:16px; background:var(--orange); border-radius:2px; }
+
+  .empty-note{ font-size:12px; color:#9AA5BC; padding:20px; text-align:center; }
+
+  /* ---------- Invoice document ---------- */
+  .invoice-doc{
+    background:white; border:1px solid #E3E6EC; border-radius:12px;
+    padding:32px; max-width:720px; box-shadow:0 4px 24px rgba(11,30,61,0.06);
+  }
+  .inv-head{ display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:20px; border-bottom:2px solid var(--navy); margin-bottom:20px; }
+  .inv-mark{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .inv-mark .dot{ width:8px;height:8px;background:var(--orange); border-radius:2px; transform:rotate(45deg); }
+  .inv-sub{ font-size:11.5px; color:#8A93AB; margin-top:2px; }
+  .inv-meta{ text-align:right; }
+  .inv-title{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; letter-spacing:.06em; color:var(--navy); }
+  .inv-num{ font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A93AB; margin-top:2px; }
+  .inv-pill{ display:inline-block; margin-top:8px; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:20px; }
+  .inv-pill.unpaid{ background:#FDE7E3; color:#C3492E; }
+  .inv-parties{ display:flex; justify-content:space-between; margin-bottom:24px; gap:20px; }
+  .inv-label{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#9AA5BC; font-family:'JetBrains Mono',monospace; margin-bottom:4px; }
+  .inv-strong{ font-size:14px; font-weight:700; color:var(--navy); }
+  .inv-table{ width:100%; border-collapse:collapse; margin-bottom:20px; }
+  .inv-table th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#8590A8; padding:8px 4px; border-bottom:1px solid #E3E6EC; }
+  .inv-table td{ padding:14px 4px; border-bottom:1px solid #EEF0F4; font-size:13px; vertical-align:top; }
+  .inv-totals{ margin-left:auto; max-width:280px; margin-bottom:24px; }
+  .inv-total-row{ display:flex; justify-content:space-between; font-size:13px; padding:6px 0; color:#5A6478; }
+  .inv-total-row.grand{ border-top:2px solid var(--navy); margin-top:4px; padding-top:10px; font-weight:700; color:var(--navy); font-size:16px; }
+  .inv-pay{ background:#F5F6F8; border-radius:8px; padding:14px 16px; }
+
+  /* ---------- Client-facing feedback form ---------- */
+  .client-view-frame{
+    background:var(--paper); border:1px solid #E3E6EC; border-radius:14px;
+    padding:0; max-width:480px; overflow:hidden; box-shadow:0 4px 24px rgba(11,30,61,0.08);
+  }
+  .cvf-bar{ background:var(--navy-deep); padding:10px 16px; display:flex; align-items:center; gap:8px; }
+  .cvf-dots{ display:flex; gap:5px; }
+  .cvf-dots span{ width:8px;height:8px;border-radius:50%; background:#33507C; }
+  .cvf-url{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8FA0C0; margin-left:8px; }
+  .cvf-body{ background:white; padding:28px 24px; }
+  .cvf-logo{ display:flex; align-items:center; gap:8px; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color:var(--navy); margin-bottom:4px; }
+  .cvf-logo .dot{ width:8px;height:8px;background:var(--orange); border-radius:2px; transform:rotate(45deg); }
+  .cvf-project{ font-size:12px; color:#8A93AB; margin-bottom:22px; }
+  .cvf-question{ font-size:14px; font-weight:600; color:var(--navy); margin-bottom:10px; }
+  .cvf-stars{ font-size:28px; color:#DDE2EC; letter-spacing:6px; margin-bottom:22px; }
+  .cvf-stars span.filled{ color:var(--orange); }
+  #public-feedback-stars span{ cursor:pointer; }
+  .cvf-textarea{
+    width:100%; min-height:80px; border:1px solid #E3E6EC; border-radius:8px; padding:12px;
+    font-family:'Inter',sans-serif; font-size:13px; color:#4A5470; resize:none; margin-bottom:18px;
+  }
+  .cvf-submit{ background:var(--orange); color:white; border:none; border-radius:8px; padding:11px 20px; font-weight:700; font-size:13px; width:100%; cursor:pointer; }
+  .cvf-note{ font-size:10.5px; color:#B7BECE; text-align:center; margin-top:10px; }
+
+  /* ---------- Headroom finalized logo (wordmark + icon) ---------- */
+  .hr-word{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:0.01em;
+    display:inline-flex; align-items:baseline; white-space:nowrap;
+  }
+  .hr-word.on-dark{ color:var(--white); }
+  .hr-word.on-light{ color:var(--navy); }
+  .hr-a{
+    position:relative; display:inline-block;
+    width:0.78em; height:0.74em; margin:0 0.01em;
+    background:var(--orange);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    transform:translateY(0.02em);
+  }
+  .hr-a::after{
+    content:''; position:absolute; left:50%; top:22%;
+    width:0.16em; height:0.14em; transform:translate(-50%,0);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+  }
+  .hr-a.on-light::after{ background:var(--paper); }
+  .hr-a.on-dark::after{ background:var(--navy-deep); }
+
+  .hr-icon{
+    border-radius:8px; background:var(--navy);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    position:relative;
+  }
+  .hr-icon .hr-icon-tri{
+    background:var(--orange);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    position:relative;
+  }
+  .hr-icon .hr-icon-tri::after{
+    content:''; position:absolute; left:50%; top:26%;
+    transform:translate(-50%,0);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    background:var(--navy);
+  }
+
+  /* ---------- Auth-driven account badge & permission scoping ---------- */
+  .account-badge{ display:flex; align-items:center; gap:8px; padding-right:6px; }
+  .account-dot{ width:8px; height:8px; border-radius:50%; background:#1D8A4E; flex-shrink:0; }
+  .account-email{ font-size:12.5px; font-weight:600; color:var(--navy); line-height:1.2; }
+  .account-role{ font-size:10.5px; color:#8A93AB; line-height:1.2; }
+
+  .nav-item.locked{ pointer-events:none; opacity:.35; }
+  .lock-icon{ display:none; width:12px; height:12px; margin-left:auto; flex-shrink:0; }
+  .nav-item.locked .lock-icon{ display:inline-flex; }
+
+  body.role-assistant .owner-only-view{ display:none !important; }
+  body.role-assistant .sensitive{ color:transparent !important; position:relative; user-select:none; }
+  body.role-assistant .sensitive::after{
+    content:'Restricted'; position:absolute; left:0; top:50%; transform:translateY(-50%);
+    color:#B7BECE; font-size:11px; font-weight:600; white-space:nowrap;
+  }
+  .assistant-banner{ display:none; }
+  body.role-assistant .assistant-banner{ display:flex; }
+  body.role-assistant .owner-banner{ display:none; }
+  body.role-viewer .content input,
+  body.role-viewer .content select,
+  body.role-viewer .content textarea,
+  body.role-viewer .content button.btn-primary{
+    pointer-events:none; opacity:.5;
+  }
+
+  /* ---------- Login screen ---------- */
+  #app-shell{ display:none; width:100%; }
+  #login-screen{
+    min-height:100vh; width:100%; display:flex; align-items:center; justify-content:center;
+    background:var(--navy-deep); padding:20px;
+  }
+  .login-card{
+    background:white; border-radius:14px; padding:36px 32px; width:100%; max-width:380px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.25);
+  }
+  .login-card .hr-word{ margin-bottom:4px; }
+  .login-sub{ font-size:12.5px; color:#8A93AB; margin-bottom:26px; }
+  .login-field{ margin-bottom:14px; }
+  .login-field label{ font-size:11.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px; }
+  .login-field input, .login-field select{
+    width:100%; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px;
+    font-family:'Inter',sans-serif; font-size:13.5px; color:var(--navy); background:white;
+  }
+  .login-field input:focus, .login-field select:focus{ outline:none; border-color:var(--orange); }
+  .login-submit{
+    width:100%; background:var(--orange); color:white; border:none; border-radius:8px;
+    padding:11px 0; font-weight:700; font-size:13.5px; cursor:pointer; margin-top:6px;
+  }
+  .login-submit:disabled{ opacity:.6; cursor:default; }
+  .login-error{
+    background:#FDE7E3; color:#C3492E; font-size:12px; border-radius:6px; padding:9px 12px; margin-bottom:14px; display:none;
+  }
+  .login-error.show{ display:block; }
+  .login-note{ font-size:11px; color:#B7BECE; text-align:center; margin-top:18px; }
+  .login-switch{ font-size:12px; color:#8A93AB; text-align:center; margin-top:14px; }
+  .login-switch a{ color:var(--orange); font-weight:600; text-decoration:none; }
+  .login-success{
+    background:#E3F3E9; color:#1D8A4E; font-size:12px; border-radius:6px; padding:9px 12px; margin-bottom:14px; display:none;
+  }
+  .login-success.show{ display:block; }
+
+  /* ---------- Password reveal modal (after approving an assistant) ---------- */
+  .pw-modal-scrim{
+    display:none; position:fixed; inset:0; background:rgba(7,21,40,0.6); z-index:60;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .pw-modal-scrim.show{ display:flex; }
+  .pw-modal{
+    background:white; border-radius:14px; padding:28px 26px; max-width:380px; width:100%;
+  }
+  .pw-modal h3{ font-family:'Space Grotesk',sans-serif; font-size:16px; margin-bottom:6px; color:var(--navy); }
+  .pw-modal p{ font-size:12.5px; color:#6B7690; margin-bottom:16px; line-height:1.6; }
+  .pw-modal .pw-row{
+    background:#F5F6F8; border:1px solid #E3E6EC; border-radius:8px; padding:12px 14px;
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+  }
+  .pw-modal .pw-row .k{ font-size:10.5px; text-transform:uppercase; color:#9AA5BC; letter-spacing:.04em; }
+  .pw-modal .pw-row .v{ font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:var(--navy); }
+  .pw-modal .btn{ margin-top:10px; width:100%; text-align:center; }
+
+  /* ---------- Generic data-entry modal (New Project / Add Client / etc.) ---------- */
+  .data-modal-scrim{
+    display:none; position:fixed; inset:0; background:rgba(7,21,40,0.6); z-index:60;
+    align-items:flex-start; justify-content:center; padding:40px 20px; overflow-y:auto;
+  }
+  .data-modal-scrim.show{ display:flex; }
+  .data-modal{
+    background:white; border-radius:14px; padding:28px 26px; max-width:440px; width:100%;
+  }
+  .data-modal h3{ font-family:'Space Grotesk',sans-serif; font-size:16px; margin-bottom:16px; color:var(--navy); }
+  .data-modal .login-field{ margin-bottom:14px; }
+  .data-modal .btn-row{ display:flex; gap:10px; margin-top:6px; }
+  .data-modal .btn-row .btn{ flex:1; text-align:center; }
+  .data-modal .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  body.theme-dark .data-modal, body.theme-dark .pw-modal{ background:#152238; color:#DCE3F0; }
+  body.theme-dark .data-modal h3, body.theme-dark .pw-modal h3{ color:#EAF0FF; }
+  body.theme-dark .login-field input, body.theme-dark .login-field select, body.theme-dark .login-field textarea{
+    background:#0E1A2E; border-color:#33507C; color:#EAF0FF;
+  }
+
+  /* ---------- Mobile nav controls (hidden on desktop) ---------- */
+  .hamburger{ display:none; }
+  .scrim{ display:none; }
+
+  /* ---------- Responsive ---------- */
+  @media(max-width:900px){
+    body{ overflow-x:hidden; }
+    .sidebar{
+      position:fixed; left:0; top:0; z-index:50;
+      transform:translateX(-100%);
+      transition:transform .22s ease;
+      box-shadow:0 0 0 rgba(0,0,0,0);
+      width:78vw;
+      max-width:280px;
+    }
+    .sidebar.open{ transform:translateX(0); box-shadow:8px 0 24px rgba(0,0,0,0.25); }
+    .scrim.open{
+      display:block; position:fixed; inset:0; background:rgba(7,21,40,0.5); z-index:40;
+    }
+    .hamburger{
+      display:flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:8px; border:1px solid #E3E6EC;
+      background:white; cursor:pointer; flex-shrink:0;
+    }
+    .hamburger span{ display:block; width:16px; height:2px; background:var(--navy); position:relative; }
+    .hamburger span::before, .hamburger span::after{
+      content:''; position:absolute; left:0; width:16px; height:2px; background:var(--navy);
+    }
+    .hamburger span::before{ top:-5px; } .hamburger span::after{ top:5px; }
+
+    .topbar{ padding:0 14px; gap:10px; }
+    .topbar h1{ font-size:16px; }
+    .topbar .sub{ display:none; }
+    .btn{ padding:7px 10px; font-size:12px; }
+    .btn-ghost{ display:none; }
+    .account-badge .account-role{ display:none; }
+    #logout-btn{ display:inline-block !important; padding:6px 10px; font-size:11px; }
+
+    .content{ padding:16px 14px 50px; }
+    .grid-4{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    .grid-3{ grid-template-columns:1fr; }
+    .grid-2{ grid-template-columns:1fr; }
+    .stat-card .value{ font-size:22px; }
+    .card{ padding:14px; }
+
+    .pipeline{ gap:8px; margin:0 -14px; padding:0 14px 10px; }
+    .stage{ min-width:78vw; }
+
+    table{ font-size:12px; }
+    th, td{ padding:8px 6px; white-space:nowrap; }
+    .card table{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+    .meta-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+
+  @media(min-width:901px){
+    .hamburger{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Public feedback page — what a client sees when they open a shared feedback link.
+     No login involved; shown instead of everything else when the URL has ?feedback=... -->
+<div id="public-feedback-page" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:var(--navy-deep); padding:20px;">
+  <div class="client-view-frame" style="max-width:420px; width:100%;">
+    <div class="cvf-bar">
+      <div class="cvf-dots"><span></span><span></span><span></span></div>
+      <div class="cvf-url">Headroom feedback</div>
+    </div>
+    <div class="cvf-body" id="public-feedback-body">
+      <div class="cvf-logo"><span class="hr-word on-light" style="font-size:16px;">HE<span class="hr-a on-light"></span>DROOM</span></div>
+      <div class="cvf-project" id="public-feedback-project">From Brighten Sounds Studio</div>
+
+      <div class="cvf-question">Your name</div>
+      <input type="text" id="public-feedback-name" class="cvf-textarea" style="min-height:auto;" placeholder="So we know who to thank">
+
+      <div class="cvf-question" style="margin-top:14px;">How was the final result?</div>
+      <div class="cvf-stars" id="public-feedback-stars">
+        <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
+      </div>
+
+      <div class="cvf-question">Anything you'd like changed or noted?</div>
+      <textarea class="cvf-textarea" id="public-feedback-comment" placeholder="Tell us what worked and what didn't — the more specific, the better."></textarea>
+
+      <button class="cvf-submit" id="public-feedback-submit">Submit feedback</button>
+      <div class="cvf-note" id="public-feedback-note">Takes under a minute · Goes straight to Kado</div>
+    </div>
+  </div>
+</div>
+
+<div id="login-screen">
+  <div class="login-card">
+    <span class="hr-word on-light" style="font-size:26px;">HE<span class="hr-a on-light"></span>DROOM</span>
+    <div class="login-sub" id="login-sub">Studio &amp; Work OS — sign in to continue</div>
+
+    <!-- Sign-in form -->
+    <div id="login-panel">
+      <div class="login-error" id="login-error"></div>
+      <form id="login-form">
+        <div class="login-field">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" autocomplete="username" required placeholder="you@brightensounds.tz">
+        </div>
+        <div class="login-field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="login-submit" id="login-submit">Sign in</button>
+      </form>
+      <div class="login-note">Owner and Assistant accounts each sign in here — access is scoped automatically based on your account.</div>
+      <div class="login-switch">New studio assistant? <a href="#" id="show-request">Request access</a></div>
+    </div>
+
+    <!-- Request-access form (for a not-yet-created assistant) -->
+    <div id="request-panel" style="display:none;">
+      <div class="login-error" id="request-error"></div>
+      <div class="login-success" id="request-success"></div>
+      <form id="request-form">
+        <div class="login-field">
+          <label for="request-name">Full name</label>
+          <input type="text" id="request-name" required placeholder="Your full name">
+        </div>
+        <div class="login-field">
+          <label for="request-email">Email</label>
+          <input type="email" id="request-email" required placeholder="you@example.com">
+        </div>
+        <div class="login-field">
+          <label for="request-phone">Phone (optional)</label>
+          <input type="tel" id="request-phone" placeholder="+255 7•• •••">
+        </div>
+        <div class="login-field">
+          <label for="request-title">Your role at the studio</label>
+          <select id="request-title" required>
+            <option value="" disabled selected>Select one…</option>
+            <option>Studio Assistant</option>
+            <option>Producer</option>
+            <option>Assistant to MD</option>
+            <option>Director</option>
+            <option>Musician</option>
+            <option>Manager</option>
+            <option>Lawyer</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="login-field">
+          <label for="request-message">Note to Kado (optional)</label>
+          <input type="text" id="request-message" placeholder="e.g. starting Monday">
+        </div>
+        <button type="submit" class="login-submit" id="request-submit">Send request</button>
+      </form>
+      <div class="login-note">Kado will review your request and send you a temporary password to log in with.</div>
+      <div class="login-switch">Already have login details? <a href="#" id="show-login">Back to sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="pw-modal-scrim" id="pw-modal-scrim">
+  <div class="pw-modal">
+    <h3>Assistant login created</h3>
+    <p>Share these details with them directly (WhatsApp, in person) — this password won't be shown again, so copy it now. Ask them to sign in and you can set a permanent password together later if you'd like.</p>
+    <div class="pw-row"><span class="k">Email</span><span class="v" id="pw-modal-email"></span></div>
+    <div class="pw-row"><span class="k">Temp password</span><span class="v" id="pw-modal-password"></span></div>
+    <button class="btn btn-primary" id="pw-modal-close">Done</button>
+  </div>
+</div>
+
+<!-- New Project modal -->
+<div class="data-modal-scrim" id="project-modal-scrim">
+  <div class="data-modal">
+    <h3>New Project</h3>
+    <form id="project-form">
+      <div class="login-field"><label>Project title</label><input type="text" id="proj-title" required placeholder="e.g. Wedding Highlight Mix"></div>
+      <div class="login-field"><label>Client name</label><input type="text" id="proj-client" required placeholder="e.g. Amani Events"></div>
+      <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, Live Event, Voice-over"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Type</label>
+          <select id="proj-type"><option value="studio">Studio</option><option value="label">Label</option></select>
+        </div>
+        <div class="login-field"><label>Stage</label>
+          <select id="proj-stage">
+            <option value="received">Received</option>
+            <option value="in_progress">In Progress</option>
+            <option value="delivered">Delivered</option>
+            <option value="feedback">Feedback</option>
+            <option value="complete">Complete</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="login-field"><label>Due date</label><input type="date" id="proj-due"></div>
+        <div class="login-field"><label>Value (TSh)</label><input type="number" id="proj-value" placeholder="0"></div>
+      </div>
+      <div class="login-field"><label>Paid status</label>
+        <select id="proj-paid">
+          <option value="unpaid">Unpaid</option>
+          <option value="paid">Paid</option>
+          <option value="partial">Partial</option>
+          <option value="free">Free</option>
+        </select>
+      </div>
+      <div class="login-field"><label>Notes (optional)</label><input type="text" id="proj-notes" placeholder="Anything worth remembering"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="project-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="project-submit">Save project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Client modal -->
+<div class="data-modal-scrim" id="client-modal-scrim">
+  <div class="data-modal">
+    <h3>Add Client</h3>
+    <form id="client-form">
+      <div class="login-field"><label>Name</label><input type="text" id="client-name" required placeholder="Client or company name"></div>
+      <div class="login-field"><label>Type</label><input type="text" id="client-type" placeholder="e.g. Label artist, Corporate, Events"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Phone</label><input type="tel" id="client-phone" placeholder="+255 ..."></div>
+        <div class="login-field"><label>Email</label><input type="email" id="client-email" placeholder="name@example.com"></div>
+      </div>
+      <div class="login-field"><label>Notes (optional)</label><input type="text" id="client-notes" placeholder="History, preferences, testimonials, etc."></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="client-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="client-submit">Save client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Artist modal -->
+<div class="data-modal-scrim" id="artist-modal-scrim">
+  <div class="data-modal">
+    <h3>Add Artist</h3>
+    <form id="artist-form">
+      <div class="login-field"><label>Name</label><input type="text" id="artist-name" required placeholder="Artist name"></div>
+      <div class="login-field"><label>Split</label><input type="text" id="artist-split" placeholder="e.g. 50 / 50, Session — flat fee"></div>
+      <div class="login-field"><label>Contract status</label>
+        <select id="artist-status"><option>Signed</option><option>Worked with</option></select>
+      </div>
+      <div class="login-field"><label>Contact</label><input type="text" id="artist-contact" placeholder="Phone or email"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="artist-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="artist-submit">Save artist</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Track modal -->
+<div class="data-modal-scrim" id="track-modal-scrim">
+  <div class="data-modal">
+    <h3>Add Track</h3>
+    <form id="track-form">
+      <div class="login-field"><label>Track title</label><input type="text" id="track-title" required placeholder="Track name"></div>
+      <div class="login-field"><label>Artist</label><input type="text" id="track-artist" placeholder="Artist name"></div>
+      <div class="field-row">
+        <div class="login-field"><label>ISRC</label><input type="text" id="track-isrc" placeholder="TZ-BS2-26-00000"></div>
+        <div class="login-field"><label>Distributor</label><input type="text" id="track-distributor" placeholder="e.g. DistroKid"></div>
+      </div>
+      <div class="field-row">
+        <div class="login-field"><label>BPM</label><input type="text" id="track-bpm" placeholder="e.g. 96"></div>
+        <div class="login-field"><label>Key</label><input type="text" id="track-key" placeholder="e.g. F# minor"></div>
+      </div>
+      <div class="login-field"><label>Release date</label><input type="date" id="track-release"></div>
+      <div class="login-field"><label>Credits</label><input type="text" id="track-credits" placeholder="e.g. Mix & Master: Kado"></div>
+      <div class="login-field"><label>Status</label><input type="text" id="track-status" placeholder="e.g. Mastering, Released"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="track-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="track-submit">Save track</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="app-shell">
+<div class="sidebar">
+  <div class="brand">
+    <div class="mark"><span class="hr-word on-dark" style="font-size:21px;">HE<span class="hr-a on-dark"></span>DROOM</span></div>
+    <div class="tag">Studio &amp; Work OS</div>
+  </div>
+
+  <div class="nav-scroll">
+  <div class="nav-group">
+    <div class="label">Overview</div>
+    <div class="nav-item active" data-view="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" data-view="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      Calendar
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="label">Work</div>
+    <div class="nav-item" data-view="projects">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7l3-4h12l3 4M3 7v13a1 1 0 001 1h16a1 1 0 001-1V7M3 7h18"/></svg>
+      Projects <span class="count" id="nav-count-projects">0</span>
+    </div>
+    <div class="nav-item" data-view="tasks">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Tasks <span class="count" id="nav-count-tasks">0</span>
+    </div>
+    <div class="nav-item owner-only-nav" data-view="invoices">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5M9 13h6M9 17h6"/></svg>
+      Invoices <span class="count" id="nav-count-invoices">0</span>
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+    <div class="nav-item owner-only-nav" data-view="finances">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Finances
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="label">Label</div>
+    <div class="nav-item owner-only-nav" data-view="vault">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+      Music Vault
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+    <div class="nav-item owner-only-nav" data-view="roster">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="18" cy="8" r="2.5"/><path d="M16.5 14c2.7.4 4.5 2.3 4.5 6"/></svg>
+      Artist Roster
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="label">Clients</div>
+    <div class="nav-item" data-view="clients">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
+      Client Database
+    </div>
+    <div class="nav-item" data-view="feedback">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2l2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 16.9 6.1 20l1.3-6.6-4.9-4.5 6.6-.8z"/></svg>
+      Feedback Portal
+    </div>
+  </div>
+
+  <div class="nav-group" style="border-bottom:none;">
+    <div class="label">Admin</div>
+    <div class="nav-item owner-only-nav" data-view="team">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="8" cy="8" r="3.5"/><path d="M2 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7"/><path d="M19 20c0-2.8-1.6-5-4-6"/></svg>
+      Team <span class="count" id="pending-count-badge" style="display:none;">0</span>
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+  </div>
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="avatar">K</div>
+    <div>
+      <div class="who" id="who-name">Kado</div>
+      <div class="role" id="who-role">Brighten Sounds · Owner</div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="hamburger" id="hamburger"><span></span></div>
+    <div>
+      <h1 id="topbar-title">Dashboard</h1>
+      <div class="sub" id="topbar-sub">Every job, every stream, one console.</div>
+    </div>
+    <div class="topbar-right">
+      <div class="account-badge">
+        <div class="account-dot"></div>
+        <div>
+          <div class="account-email" id="account-email">kado@brightensounds.tz</div>
+          <div class="account-role" id="account-role">Owner · Full access</div>
+        </div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
+        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0B1E3D" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0B1E3D" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+      </button>
+      <button class="btn btn-ghost" id="search-btn">Search ⌘K</button>
+      <button class="btn btn-primary" id="new-btn">+ New Project</button>
+      <button class="btn btn-ghost" id="logout-btn" title="Log out">Log out</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ================= DASHBOARD ================= -->
+    <div class="view active" id="view-dashboard">
+
+      <div class="grid grid-4">
+        <div class="card stat-card"><div class="bar"></div>
+          <div class="label">Active Projects</div>
+          <div class="value">0</div>
+        </div>
+        <div class="card stat-card"><div class="bar"></div>
+          <div class="label">Outstanding Invoices</div>
+          <div class="value">TSh 0</div>
+        </div>
+        <div class="card stat-card"><div class="bar"></div>
+          <div class="label">Revenue — this month</div>
+          <div class="value">TSh 0</div>
+        </div>
+        <div class="card stat-card"><div class="bar"></div>
+          <div class="label">Deadlines — 7 days</div>
+          <div class="value">0</div>
+        </div>
+      </div>
+
+      <div class="section-title">Pipeline snapshot</div>
+      <div class="card">
+        <div class="pipeline">
+          <div class="stage" style="--stage-color:#8FA0C0">
+            <div class="stage-head"><span class="name">Received</span><span class="n">0</span></div>
+            <div class="empty-note">No projects yet</div>
+          </div>
+          <div class="stage" style="--stage-color:var(--orange)">
+            <div class="stage-head"><span class="name">In Progress</span><span class="n">0</span></div>
+            <div class="empty-note">No projects yet</div>
+          </div>
+          <div class="stage" style="--stage-color:#13294F">
+            <div class="stage-head"><span class="name">Delivered</span><span class="n">0</span></div>
+            <div class="empty-note">No projects yet</div>
+          </div>
+          <div class="stage" style="--stage-color:#9A7514">
+            <div class="stage-head"><span class="name">Feedback</span><span class="n">0</span></div>
+            <div class="empty-note">No projects yet</div>
+          </div>
+          <div class="stage" style="--stage-color:#1D8A4E">
+            <div class="stage-head"><span class="name">Complete</span><span class="n">0</span></div>
+            <div class="empty-note">No projects yet</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:20px;">
+        <div class="card">
+          <h3>Upcoming <span class="more">View calendar</span></h3>
+          <div class="empty-note">Nothing scheduled yet</div>
+        </div>
+        <div class="card">
+          <h3>Latest feedback</h3>
+          <div class="empty-note">No feedback received yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= PROJECTS ================= -->
+    <div class="view" id="view-projects">
+      <div class="pipeline">
+        <div class="stage" style="--stage-color:#8FA0C0">
+          <div class="stage-head"><span class="name">Received</span><span class="n" id="stage-count-received">0</span></div>
+          <div id="stage-jobs-received"><div class="empty-note">No projects yet</div></div>
+        </div>
+        <div class="stage" style="--stage-color:var(--orange)">
+          <div class="stage-head"><span class="name">In Progress</span><span class="n" id="stage-count-in_progress">0</span></div>
+          <div id="stage-jobs-in_progress"><div class="empty-note">No projects yet</div></div>
+        </div>
+        <div class="stage" style="--stage-color:#13294F">
+          <div class="stage-head"><span class="name">Delivered</span><span class="n" id="stage-count-delivered">0</span></div>
+          <div id="stage-jobs-delivered"><div class="empty-note">No projects yet</div></div>
+        </div>
+        <div class="stage" style="--stage-color:#9A7514">
+          <div class="stage-head"><span class="name">Feedback</span><span class="n" id="stage-count-feedback">0</span></div>
+          <div id="stage-jobs-feedback"><div class="empty-note">No projects yet</div></div>
+        </div>
+        <div class="stage" style="--stage-color:#1D8A4E">
+          <div class="stage-head"><span class="name">Complete</span><span class="n" id="stage-count-complete">0</span></div>
+          <div id="stage-jobs-complete"><div class="empty-note">No projects yet</div></div>
+        </div>
+      </div>
+      <div class="section-title">All projects</div>
+      <div class="card" id="projects-table-card">
+        <div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>
+      </div>
+    </div>
+
+    <!-- ================= CLIENTS ================= -->
+    <div class="view" id="view-clients">
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-client-btn">+ Add Client</button></div>
+      <div class="card" id="clients-table-card">
+        <div class="empty-note">No clients yet — click "+ Add Client" to add one, including clients you worked with before Headroom.</div>
+      </div>
+    </div>
+
+    <!-- ================= ROSTER ================= -->
+    <div class="view owner-only-view" id="view-roster">
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-artist-btn">+ Add Artist</button></div>
+      <div class="card" id="artists-table-card">
+        <div class="empty-note">No artists on the roster yet.</div>
+      </div>
+    </div>
+
+    <!-- ================= VAULT ================= -->
+    <div class="view owner-only-view" id="view-vault">
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-track-btn">+ Add Track</button></div>
+      <div class="card" id="tracks-table-card">
+        <div class="empty-note">No tracks in the vault yet.</div>
+      </div>
+    </div>
+
+    <!-- ================= INVOICES ================= -->
+    <div class="view owner-only-view" id="view-invoices">
+      <div class="card" id="invoices-table-card">
+        <div class="empty-note">No invoices yet — an invoice appears automatically here for any project with a value greater than zero.</div>
+      </div>
+
+      <div class="section-title">Invoice format</div>
+      <div class="invoice-doc">
+        <div class="inv-head">
+          <div class="inv-brand">
+            <div class="inv-mark"><span class="hr-word on-light" style="font-size:18px;">HE<span class="hr-a on-light"></span>DROOM</span></div>
+            <div class="inv-sub">Brighten Sounds Studio · Dar es Salaam, Tanzania</div>
+            <div class="inv-sub">Yusuph Hussein Kadondoro (KADO)</div>
+          </div>
+          <div class="inv-meta">
+            <div class="inv-title">INVOICE</div>
+            <div class="inv-num">INV-0001</div>
+          </div>
+        </div>
+
+        <div class="inv-parties">
+          <div>
+            <div class="inv-label">Billed to</div>
+            <div class="inv-strong">—</div>
+          </div>
+          <div>
+            <div class="inv-label">Issued</div>
+            <div class="inv-strong">—</div>
+            <div class="inv-label" style="margin-top:10px;">Due</div>
+            <div class="inv-strong">—</div>
+          </div>
+        </div>
+
+        <table class="inv-table">
+          <tr><th>Description</th><th>Details</th><th style="text-align:right;">Amount</th></tr>
+          <tr><td colspan="3" class="sub-cell">Line items appear here once a project is billed.</td></tr>
+        </table>
+
+        <div class="inv-totals">
+          <div class="inv-total-row grand"><span>Total due</span><span>—</span></div>
+        </div>
+
+        <div class="inv-pay">
+          <div class="inv-label">Payment details</div>
+          <div class="inv-sub">Mobile money: +255 627 337 589 (Yusuph Hussein Kadondoro)</div>
+          <div class="inv-sub">Bank transfer: CRDB Bank, Account 010396180621 — Yusuph Hussein Kadondoro</div>
+          <div class="inv-sub" style="margin-top:6px; font-style:italic;">A dedicated Headroom business account is in progress — these will update once it's ready.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= FINANCES ================= -->
+    <div class="view owner-only-view" id="view-finances">
+      <div class="grid grid-3">
+        <div class="card stat-card"><div class="bar"></div><div class="label">Total income</div><div class="value" id="fin-income">TSh 0</div></div>
+        <div class="card stat-card"><div class="bar"></div><div class="label">Outstanding</div><div class="value" id="fin-outstanding">TSh 0</div></div>
+        <div class="card stat-card"><div class="bar"></div><div class="label">Label spend</div><div class="value" id="fin-label-spend">TSh 0</div></div>
+      </div>
+
+      <div class="section-title">Client Work vs. Own Label</div>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>Client Work <span class="sub-cell">Studio-tagged projects</span></h3>
+          <div id="fin-client-work"><div class="empty-note">No client work logged yet.</div></div>
+        </div>
+        <div class="card">
+          <h3>Own Label <span class="sub-cell">Label-tagged projects</span></h3>
+          <div id="fin-label-work"><div class="empty-note">No label spend logged yet.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= FEEDBACK ================= -->
+    <div class="view" id="view-feedback">
+      <div class="card">
+        <h3>Get a shareable link</h3>
+        <div class="login-field" style="max-width:360px;">
+          <label>Choose a project</label>
+          <select id="feedback-project-select"><option value="">Select a project…</option></select>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1; background:#F5F6F8; border:1px solid #E3E6EC; border-radius:6px; padding:9px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4A5470; word-break:break-all;" id="feedback-link-display">Select a project above to generate its link</div>
+          <button class="btn btn-ghost" id="feedback-copy-btn">Copy</button>
+        </div>
+      </div>
+
+      <div class="section-title">Feedback form preview</div>
+      <div class="client-view-frame">
+        <div class="cvf-bar">
+          <div class="cvf-dots"><span></span><span></span><span></span></div>
+          <div class="cvf-url" id="feedback-preview-url">headroom.app/index.html?feedback=…</div>
+        </div>
+        <div class="cvf-body">
+          <div class="cvf-logo"><span class="hr-word on-light" style="font-size:16px;">HE<span class="hr-a on-light"></span>DROOM</span></div>
+          <div class="cvf-project">From Brighten Sounds Studio</div>
+
+          <div class="cvf-question">How was the final result?</div>
+          <div class="cvf-stars"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+
+          <div class="cvf-question">Anything you'd like changed or noted?</div>
+          <textarea class="cvf-textarea" placeholder="Tell us what worked and what didn't — the more specific, the better."></textarea>
+
+          <button class="cvf-submit">Submit feedback</button>
+          <div class="cvf-note">Takes under a minute · Goes straight to Kado</div>
+        </div>
+      </div>
+
+      <div class="section-title">Received feedback</div>
+      <div class="card" id="feedback-received-card">
+        <div class="empty-note">No feedback received yet — once clients start submitting, real entries will show up here.</div>
+      </div>
+    </div>
+
+    <!-- ================= TEAM (owner only) ================= -->
+    <div class="view owner-only-view" id="view-team">
+      <div class="section-title">Pending requests</div>
+      <div class="card" id="pending-requests-card">
+        <div class="empty-note" id="pending-empty">No pending requests right now.</div>
+        <table id="pending-requests-table" style="display:none;">
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Note</th><th>Requested</th><th>Grant access as</th><th></th></tr>
+          <tbody id="pending-requests-body"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Team members</div>
+      <div class="card" id="team-members-card">
+        <div class="empty-note" id="team-empty">Loading…</div>
+        <table id="team-members-table" style="display:none;">
+          <tr><th>Name</th><th>Title</th><th>Email</th><th>Access</th><th>Joined</th><th></th></tr>
+          <tbody id="team-members-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ================= TASKS ================= -->
+    <div class="view" id="view-tasks">
+      <div class="card">
+        <div class="empty-note">No tasks yet — once this is connected to real data, tasks you add will be saved and checked off here permanently.</div>
+      </div>
+    </div>
+
+    <!-- ================= CALENDAR ================= -->
+    <div class="view" id="view-calendar">
+      <div class="card">
+        <div class="empty-note">Nothing scheduled yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+  const titles = {
+    dashboard: ["Dashboard","Every job, every stream, one console."],
+    projects: ["Projects","Full pipeline across every service line."],
+    clients: ["Client Database","Contacts, history, and notes per client."],
+    roster: ["Artist Roster","Artists signed and worked with."],
+    vault: ["Music Vault","Metadata per track — from ISRC to splits."],
+    invoices: ["Invoices","Auto-generated, PDF-ready, tracked to paid."],
+    finances: ["Finances","Income, expenses, and per-project margin."],
+    feedback: ["Feedback Portal","Shareable link, star rating, and notes."],
+    team: ["Team","Review access requests and manage logins."],
+    tasks: ["Tasks","Work across studio, label, publishing, and freelance."],
+    calendar: ["Calendar","Sessions, deadlines, and release dates."]
+  };
+  const sidebar = document.querySelector('.sidebar');
+  const scrim = document.getElementById('scrim');
+  const hamburger = document.getElementById('hamburger');
+  function openDrawer(){ sidebar.classList.add('open'); scrim.classList.add('open'); }
+  function closeDrawer(){ sidebar.classList.remove('open'); scrim.classList.remove('open'); }
+  hamburger.addEventListener('click', openDrawer);
+  scrim.addEventListener('click', closeDrawer);
+
+  document.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+      item.classList.add('active');
+      const key = item.dataset.view;
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      document.getElementById('view-'+key).classList.add('active');
+      document.getElementById('topbar-title').textContent = titles[key][0];
+      document.getElementById('topbar-sub').textContent = titles[key][1];
+      closeDrawer();
+    });
+  });
+
+  // ---------- Role & permission application (driven by logged-in account) ----------
+  const ownerOnlyNavItems = document.querySelectorAll('.owner-only-nav');
+
+  function goToDashboard(){
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelector('.nav-item[data-view="dashboard"]').classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-dashboard').classList.add('active');
+    document.getElementById('topbar-title').textContent = titles.dashboard[0];
+    document.getElementById('topbar-sub').textContent = titles.dashboard[1];
+  }
+
+  function applyRole(role, email, fullName, title){
+    const isOwner = role === 'owner';
+    const isViewer = role === 'viewer';
+    const isRestricted = !isOwner; // assistant or viewer both lose owner-only sections
+    document.body.classList.toggle('role-assistant', isRestricted);
+    document.body.classList.toggle('role-viewer', isViewer);
+    ownerOnlyNavItems.forEach(i=>i.classList.toggle('locked', isRestricted));
+    document.getElementById('who-name').textContent = fullName || email;
+    document.getElementById('who-role').textContent = title || (isOwner ? 'Owner' : (isViewer ? 'Viewer' : 'Assistant'));
+    document.getElementById('account-email').textContent = fullName || email;
+    document.getElementById('account-role').textContent = (title ? title + ' · ' : '') + (isOwner ? 'Full access' : (isViewer ? 'Read-only' : 'Limited access'));
+    const newBtn = document.getElementById('new-btn');
+    if (newBtn) newBtn.style.display = isViewer ? 'none' : '';
+    const activeView = document.querySelector('.view.active');
+    if (isRestricted && activeView && activeView.classList.contains('owner-only-view')){
+      goToDashboard();
+    }
+  }
+
+  // ---------- Supabase auth wiring ----------
+  // Fill these in from your Supabase project (Settings → API) before deploying.
+  const SUPABASE_URL = "https://kcrtmzchfksmofylbtqk.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjcnRtemNoZmtzbW9meWxidHFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjgxMDYsImV4cCI6MjEwMDgwNDEwNn0.uN08qt3d4X-VMlFEIEA37aEdjDY-WGs_dG835koycdU";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const loginScreen = document.getElementById('login-screen');
+  const appShell = document.getElementById('app-shell');
+  const loginForm = document.getElementById('login-form');
+  const loginError = document.getElementById('login-error');
+  const loginSubmit = document.getElementById('login-submit');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  function showApp(){ loginScreen.style.display = 'none'; appShell.style.display = 'flex'; }
+  function showLogin(){ loginScreen.style.display = 'flex'; appShell.style.display = 'none'; }
+
+  async function loadProfileAndEnter(user){
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('role, full_name, title')
+      .eq('id', user.id)
+      .single();
+    if (error || !data){
+      loginError.textContent = "Signed in, but no profile/role found for this account. Ask the owner to add you in Supabase.";
+      loginError.classList.add('show');
+      await supabaseClient.auth.signOut();
+      showLogin();
+      return;
+    }
+    applyRole(data.role, user.email, data.full_name, data.title);
+    showApp();
+    loadAllData();
+  }
+
+  loginForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    loginError.classList.remove('show');
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = 'Signing in…';
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    loginSubmit.disabled = false;
+    loginSubmit.textContent = 'Sign in';
+    if (error){
+      loginError.textContent = error.message || "Couldn't sign in — check your email and password.";
+      loginError.classList.add('show');
+      return;
+    }
+    await loadProfileAndEnter(data.user);
+  });
+
+  logoutBtn.addEventListener('click', async ()=>{
+    await supabaseClient.auth.signOut();
+    showLogin();
+  });
+
+  // On load, resume an existing session if there is one
+  (async ()=>{
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session && session.user){
+      await loadProfileAndEnter(session.user);
+    } else {
+      showLogin();
+    }
+  })();
+
+  // ---------- Login screen: toggle between sign-in and request-access ----------
+  const loginPanel = document.getElementById('login-panel');
+  const requestPanel = document.getElementById('request-panel');
+  const loginSub = document.getElementById('login-sub');
+  document.getElementById('show-request').addEventListener('click', (e)=>{
+    e.preventDefault();
+    loginPanel.style.display = 'none';
+    requestPanel.style.display = 'block';
+    loginSub.textContent = 'Request assistant access';
+  });
+  document.getElementById('show-login').addEventListener('click', (e)=>{
+    e.preventDefault();
+    requestPanel.style.display = 'none';
+    loginPanel.style.display = 'block';
+    loginSub.textContent = 'Studio & Work OS — sign in to continue';
+  });
+
+  // ---------- Request-access form (no login needed to submit) ----------
+  const requestForm = document.getElementById('request-form');
+  const requestError = document.getElementById('request-error');
+  const requestSuccess = document.getElementById('request-success');
+  const requestSubmit = document.getElementById('request-submit');
+
+  requestForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    requestError.classList.remove('show');
+    requestSuccess.classList.remove('show');
+    requestSubmit.disabled = true;
+    requestSubmit.textContent = 'Sending…';
+    const payload = {
+      full_name: document.getElementById('request-name').value.trim(),
+      email: document.getElementById('request-email').value.trim(),
+      phone: document.getElementById('request-phone').value.trim(),
+      title: document.getElementById('request-title').value,
+      message: document.getElementById('request-message').value.trim(),
+    };
+    const { error } = await supabaseClient.from('assistant_requests').insert(payload);
+    requestSubmit.disabled = false;
+    requestSubmit.textContent = 'Send request';
+    if (error){
+      requestError.textContent = error.message || "Couldn't send your request — try again.";
+      requestError.classList.add('show');
+      return;
+    }
+    requestForm.reset();
+    requestSuccess.textContent = "Request sent — Kado will be in touch with your login details.";
+    requestSuccess.classList.add('show');
+  });
+
+  // ---------- Team page (owner only): review requests, approve, manage members ----------
+  async function loadTeamPage(){
+    const pendingBody = document.getElementById('pending-requests-body');
+    const pendingTable = document.getElementById('pending-requests-table');
+    const pendingEmpty = document.getElementById('pending-empty');
+    const badge = document.getElementById('pending-count-badge');
+
+    const { data: requests } = await supabaseClient
+      .from('assistant_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (requests && requests.length){
+      pendingEmpty.style.display = 'none';
+      pendingTable.style.display = 'table';
+      badge.style.display = 'inline-block';
+      badge.textContent = requests.length;
+      pendingBody.innerHTML = requests.map(r => `
+        <tr class="rowhover">
+          <td class="name-cell">${r.full_name}</td>
+          <td>${r.email}</td>
+          <td>${r.phone || '—'}</td>
+          <td class="sub-cell">${r.title || '—'}</td>
+          <td class="sub-cell">${r.message || '—'}</td>
+          <td class="sub-cell">${new Date(r.created_at).toLocaleDateString()}</td>
+          <td>
+            <select class="grant-role-select" data-id="${r.id}" style="font-size:12px; padding:5px 8px; border-radius:6px; border:1px solid #E3E6EC;">
+              <option value="assistant">Assistant — can edit projects/tasks</option>
+              <option value="viewer">Viewer — read-only updates</option>
+            </select>
+          </td>
+          <td><button class="btn btn-primary approve-btn" data-id="${r.id}" style="padding:6px 12px; font-size:12px; white-space:nowrap;">Approve &amp; generate password</button></td>
+        </tr>
+      `).join('');
+      pendingBody.querySelectorAll('.approve-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const select = pendingBody.querySelector(`.grant-role-select[data-id="${btn.dataset.id}"]`);
+          approveRequest(btn.dataset.id, select.value, btn);
+        });
+      });
+    } else {
+      pendingTable.style.display = 'none';
+      pendingEmpty.style.display = 'block';
+      badge.style.display = 'none';
+    }
+
+    const teamBody = document.getElementById('team-members-body');
+    const teamTable = document.getElementById('team-members-table');
+    const teamEmpty = document.getElementById('team-empty');
+    const { data: members } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (members && members.length){
+      teamEmpty.style.display = 'none';
+      teamTable.style.display = 'table';
+      teamBody.innerHTML = members.map(m => `
+        <tr class="rowhover">
+          <td class="name-cell">${m.full_name || '—'}</td>
+          <td class="sub-cell">${m.title || '—'}</td>
+          <td>${m.email || '—'}</td>
+          <td><span class="pill ${m.role === 'owner' ? 'active' : (m.role === 'viewer' ? 'partial' : 'signed')}">${m.role}</span></td>
+          <td class="sub-cell">${m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
+          <td>${m.role === 'owner' ? '' : `<button class="btn btn-ghost remove-btn" data-id="${m.id}" data-name="${m.full_name || m.email}" style="padding:5px 10px; font-size:11.5px;">Remove</button>`}</td>
+        </tr>
+      `).join('');
+      teamBody.querySelectorAll('.remove-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>removeMember(btn.dataset.id, btn.dataset.name, btn));
+      });
+    } else {
+      teamEmpty.textContent = 'No team members yet.';
+    }
+  }
+
+  async function approveRequest(requestId, grantedRole, btn){
+    btn.disabled = true;
+    btn.textContent = 'Approving…';
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/approve-assistant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ request_id: requestId, granted_role: grantedRole }),
+      });
+      const result = await res.json();
+      if (!res.ok){
+        alert(result.error || "Couldn't approve this request.");
+        btn.disabled = false;
+        btn.textContent = 'Approve & generate password';
+        return;
+      }
+      document.getElementById('pw-modal-email').textContent = result.email;
+      document.getElementById('pw-modal-password').textContent = result.temp_password;
+      document.getElementById('pw-modal-scrim').classList.add('show');
+      await loadTeamPage();
+    } catch (err){
+      alert('Network error while approving — check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Approve & generate password';
+    }
+  }
+
+  async function removeMember(id, name, btn){
+    if (!confirm(`Remove ${name}'s access to Headroom? They will no longer be able to log in.`)) return;
+    btn.disabled = true;
+    btn.textContent = 'Removing…';
+    const { error } = await supabaseClient.from('profiles').delete().eq('id', id);
+    if (error){
+      alert(error.message || "Couldn't remove this person.");
+      btn.disabled = false;
+      btn.textContent = 'Remove';
+      return;
+    }
+    await loadTeamPage();
+  }
+
+  document.getElementById('pw-modal-close').addEventListener('click', ()=>{
+    document.getElementById('pw-modal-scrim').classList.remove('show');
+  });
+
+  // Load the Team page's data whenever it's opened
+  document.querySelector('.nav-item[data-view="team"]').addEventListener('click', loadTeamPage);
+
+  // ---------- Dark mode ----------
+  const themeToggle = document.getElementById('theme-toggle');
+  function applyTheme(theme){
+    document.body.classList.toggle('theme-dark', theme === 'dark');
+    try { localStorage.setItem('headroom-theme', theme); } catch(e){}
+  }
+  themeToggle.addEventListener('click', ()=>{
+    const isDark = document.body.classList.contains('theme-dark');
+    applyTheme(isDark ? 'light' : 'dark');
+  });
+  (function(){
+    let saved = 'light';
+    try { saved = localStorage.getItem('headroom-theme') || 'light'; } catch(e){}
+    applyTheme(saved);
+  })();
+
+  // ---------- Search / Cmd+K command palette ----------
+  // Jumps to any sidebar section by name — a lightweight "search" for now.
+  // (Searching inside actual project/client/invoice data will come once
+  // those are backed by real records instead of sample content.)
+  const searchBtn = document.getElementById('search-btn');
+  function openCommandPalette(){
+    const items = Array.from(document.querySelectorAll('.nav-item:not(.locked)'))
+      .map(el => ({ label: el.textContent.trim().replace(/\d+$/,'').trim(), view: el.dataset.view }));
+    const choice = prompt(
+      "Jump to:\n" + items.map((it,i)=>`${i+1}. ${it.label}`).join("\n") + "\n\nType a number:"
+    );
+    const idx = parseInt(choice, 10) - 1;
+    if (items[idx]){
+      document.querySelector(`.nav-item[data-view="${items[idx].view}"]`).click();
+    }
+  }
+  searchBtn.addEventListener('click', openCommandPalette);
+  document.addEventListener('keydown', (e)=>{
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){
+      e.preventDefault();
+      openCommandPalette();
+    }
+  });
+
+  // ---------- Install as an app (PWA) ----------
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{ /* fine if this fails locally */ });
+    });
+  }
+
+  // =========================================================
+  // Real data: Projects, Clients, Artists, Tracks, Feedback
+  // =========================================================
+
+  const money = (n) => 'TSh ' + Number(n || 0).toLocaleString();
+  const stageLabel = { received:'Received', in_progress:'In Progress', delivered:'Delivered', feedback:'Feedback', complete:'Complete' };
+
+  async function loadAllData(){
+    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList()]);
+  }
+
+  // ---- Projects ----
+  async function loadProjects(){
+    const { data: projects } = await supabaseClient.from('projects').select('*').order('created_at', { ascending: false });
+    const list = projects || [];
+
+    document.getElementById('nav-count-projects').textContent = list.length;
+
+    ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
+      const inStage = list.filter(p => p.stage === stage);
+      document.getElementById('stage-count-' + stage).textContent = inStage.length;
+      const container = document.getElementById('stage-jobs-' + stage);
+      container.innerHTML = inStage.length
+        ? inStage.map(p => `
+            <div class="job">
+              <div class="jtitle">${p.title}</div>
+              <div class="jclient">${p.client_name || ''}</div>
+              <div class="jmeta"><span class="tag-svc mix">${p.service || 'Project'}</span><span class="due">${p.due_date ? new Date(p.due_date).toLocaleDateString() : ''}</span></div>
+            </div>`).join('')
+        : '<div class="empty-note">No projects yet</div>';
+    });
+
+    const tableCard = document.getElementById('projects-table-card');
+    if (!list.length){
+      tableCard.innerHTML = '<div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>';
+    } else {
+      tableCard.innerHTML = `
+        <table>
+          <tr><th>Project</th><th>Client</th><th>Service</th><th>Type</th><th>Stage</th><th>Due</th><th>Value</th><th>Paid</th></tr>
+          ${list.map(p => `
+            <tr class="rowhover">
+              <td class="name-cell">${p.title}</td>
+              <td>${p.client_name || '—'}</td>
+              <td>${p.service || '—'}</td>
+              <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : 'Studio'}</span></td>
+              <td><span class="pill ${p.stage === 'complete' ? 'paid' : (p.stage === 'received' ? 'signed' : 'active')}">${stageLabel[p.stage]}</span></td>
+              <td>${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
+              <td class="sensitive">${money(p.value)}</td>
+              <td class="sensitive"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
+            </tr>`).join('')}
+        </table>`;
+    }
+
+    renderInvoicesAndFinances(list);
+    populateFeedbackProjectSelect(list);
+
+    // Dashboard summary
+    const activeCount = list.filter(p => p.stage !== 'complete').length;
+    const dashActive = document.querySelector('#view-dashboard .stat-card .value');
+    if (dashActive) dashActive.textContent = activeCount;
+  }
+
+  function renderInvoicesAndFinances(projects){
+    const billable = projects.filter(p => Number(p.value) > 0);
+    const invCard = document.getElementById('invoices-table-card');
+    document.getElementById('nav-count-invoices').textContent = billable.filter(p => p.paid_status !== 'paid').length;
+
+    invCard.innerHTML = billable.length
+      ? `<table>
+          <tr><th>Project</th><th>Client</th><th>Amount</th><th>Status</th></tr>
+          ${billable.map(p => `
+            <tr class="rowhover">
+              <td class="name-cell">${p.title}</td>
+              <td>${p.client_name || '—'}</td>
+              <td>${money(p.value)}</td>
+              <td><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
+            </tr>`).join('')}
+        </table>`
+      : '<div class="empty-note">No invoices yet — an invoice appears automatically here for any project with a value greater than zero.</div>';
+
+    const clientWork = projects.filter(p => p.project_type === 'studio' && Number(p.value) > 0);
+    const labelWork = projects.filter(p => p.project_type === 'label');
+    const totalIncome = clientWork.filter(p => p.paid_status === 'paid').reduce((s,p)=>s+Number(p.value||0),0);
+    const outstanding = clientWork.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
+    const labelSpend = labelWork.reduce((s,p)=>s+Number(p.value||0),0);
+
+    document.getElementById('fin-income').textContent = money(totalIncome);
+    document.getElementById('fin-outstanding').textContent = money(outstanding);
+    document.getElementById('fin-label-spend').textContent = money(labelSpend);
+
+    document.getElementById('fin-client-work').innerHTML = clientWork.length
+      ? `<table>${clientWork.map(p=>`<tr><td class="sub-cell">${p.title}</td><td class="name-cell">${money(p.value)}</td><td><span class="pill ${p.paid_status}">${p.paid_status}</span></td></tr>`).join('')}</table>`
+      : '<div class="empty-note">No client work logged yet.</div>';
+
+    document.getElementById('fin-label-work').innerHTML = labelWork.length
+      ? `<table>${labelWork.map(p=>`<tr><td class="sub-cell">${p.title}</td><td class="name-cell">${money(p.value)}</td><td><span class="pill ${p.paid_status}">${p.paid_status}</span></td></tr>`).join('')}</table>`
+      : '<div class="empty-note">No label spend logged yet.</div>';
+  }
+
+  // ---- Clients ----
+  async function loadClients(){
+    const { data } = await supabaseClient.from('clients').select('*').order('created_at', { ascending: false });
+    const list = data || [];
+    const card = document.getElementById('clients-table-card');
+    card.innerHTML = list.length
+      ? `<table>
+          <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>Notes</th></tr>
+          ${list.map(c => `<tr class="rowhover"><td class="name-cell">${c.name}</td><td>${c.type||'—'}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td><td class="sub-cell">${c.notes||'—'}</td></tr>`).join('')}
+        </table>`
+      : '<div class="empty-note">No clients yet — click "+ Add Client" to add one, including clients you worked with before Headroom.</div>';
+  }
+
+  // ---- Artists (roster) ----
+  async function loadArtists(){
+    const { data } = await supabaseClient.from('artists').select('*').order('created_at', { ascending: false });
+    const list = data || [];
+    const card = document.getElementById('artists-table-card');
+    card.innerHTML = list.length
+      ? `<table>
+          <tr><th>Artist</th><th>Split</th><th>Contract</th><th>Contact</th></tr>
+          ${list.map(a => `<tr class="rowhover"><td class="name-cell">${a.name}</td><td>${a.split||'—'}</td><td><span class="pill signed">${a.contract_status||'—'}</span></td><td>${a.contact||'—'}</td></tr>`).join('')}
+        </table>`
+      : '<div class="empty-note">No artists on the roster yet.</div>';
+  }
+
+  // ---- Tracks (music vault) — expandable rows ----
+  async function loadTracks(){
+    const { data } = await supabaseClient.from('tracks').select('*').order('created_at', { ascending: false });
+    const list = data || [];
+    const card = document.getElementById('tracks-table-card');
+    if (!list.length){
+      card.innerHTML = '<div class="empty-note">No tracks in the vault yet.</div>';
+      return;
+    }
+    card.innerHTML = list.map((t, i) => `
+      <div class="job" style="margin-bottom:8px; cursor:pointer;" onclick="document.getElementById('track-detail-${i}').classList.toggle('show-track')">
+        <div class="jtitle">${t.title} <span class="sub-cell">— ${t.artist_name || 'Unknown artist'}</span></div>
+        <div id="track-detail-${i}" class="track-detail">
+          <div class="meta-grid" style="margin-top:10px;">
+            <div class="meta-cell"><div class="k">ISRC</div><div class="v">${t.isrc || '—'}</div></div>
+            <div class="meta-cell"><div class="k">Distributor</div><div class="v">${t.distributor || '—'}</div></div>
+            <div class="meta-cell"><div class="k">Release date</div><div class="v">${t.release_date ? new Date(t.release_date).toLocaleDateString() : '—'}</div></div>
+            <div class="meta-cell"><div class="k">BPM</div><div class="v">${t.bpm || '—'}</div></div>
+            <div class="meta-cell"><div class="k">Key</div><div class="v">${t.key || '—'}</div></div>
+            <div class="meta-cell"><div class="k">Credits</div><div class="v">${t.credits || '—'}</div></div>
+            <div class="meta-cell"><div class="k">Status</div><div class="v">${t.status || '—'}</div></div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ---- Feedback (received list + link generator) ----
+  async function loadFeedbackList(){
+    const { data } = await supabaseClient
+      .from('feedback')
+      .select('*, projects(title, client_name)')
+      .order('created_at', { ascending: false });
+    const list = data || [];
+    const card = document.getElementById('feedback-received-card');
+    card.innerHTML = list.length
+      ? list.map(f => `
+          <div style="margin-bottom:16px;">
+            <div class="stars">${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}</div>
+            <div class="quote">"${f.comment || 'No written comment.'}"</div>
+            <div class="sub-cell" style="margin-top:4px;">${f.client_name || 'Anonymous'} · ${f.projects ? f.projects.title : 'Project removed'} · ${new Date(f.created_at).toLocaleDateString()}</div>
+          </div>`).join('')
+      : '<div class="empty-note">No feedback received yet — once clients start submitting, real entries will show up here.</div>';
+
+    // update dashboard "Latest feedback" card too
+    const dashCard = document.querySelectorAll('#view-dashboard .card')[2] || null;
+  }
+
+  function populateFeedbackProjectSelect(projects){
+    const select = document.getElementById('feedback-project-select');
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '<option value="">Select a project…</option>' +
+      projects.map(p => `<option value="${p.id}">${p.title} — ${p.client_name || ''}</option>`).join('');
+    if (current) select.value = current;
+  }
+
+  const feedbackSelect = document.getElementById('feedback-project-select');
+  if (feedbackSelect){
+    feedbackSelect.addEventListener('change', ()=>{
+      const display = document.getElementById('feedback-link-display');
+      const previewUrl = document.getElementById('feedback-preview-url');
+      if (!feedbackSelect.value){
+        display.textContent = 'Select a project above to generate its link';
+        previewUrl.textContent = 'headroom.app/index.html?feedback=…';
+        return;
+      }
+      const link = `${location.origin}${location.pathname}?feedback=${feedbackSelect.value}`;
+      display.textContent = link;
+      previewUrl.textContent = link;
+    });
+  }
+  const feedbackCopyBtn = document.getElementById('feedback-copy-btn');
+  if (feedbackCopyBtn){
+    feedbackCopyBtn.addEventListener('click', ()=>{
+      const text = document.getElementById('feedback-link-display').textContent;
+      if (text && text.startsWith('http')){
+        navigator.clipboard?.writeText(text);
+        feedbackCopyBtn.textContent = 'Copied!';
+        setTimeout(()=>{ feedbackCopyBtn.textContent = 'Copy'; }, 1500);
+      }
+    });
+  }
+
+  // =========================================================
+  // Modals: New Project / Add Client / Add Artist / Add Track
+  // =========================================================
+  function wireModal(scrimId, cancelId){
+    const scrim = document.getElementById(scrimId);
+    document.getElementById(cancelId).addEventListener('click', ()=> scrim.classList.remove('show'));
+    scrim.addEventListener('click', (e)=>{ if (e.target === scrim) scrim.classList.remove('show'); });
+  }
+  wireModal('project-modal-scrim', 'project-cancel');
+  wireModal('client-modal-scrim', 'client-cancel');
+  wireModal('artist-modal-scrim', 'artist-cancel');
+  wireModal('track-modal-scrim', 'track-cancel');
+
+  document.getElementById('new-btn').addEventListener('click', ()=>{
+    document.getElementById('project-modal-scrim').classList.add('show');
+  });
+  const addClientBtn = document.getElementById('add-client-btn');
+  if (addClientBtn) addClientBtn.addEventListener('click', ()=> document.getElementById('client-modal-scrim').classList.add('show'));
+  const addArtistBtn = document.getElementById('add-artist-btn');
+  if (addArtistBtn) addArtistBtn.addEventListener('click', ()=> document.getElementById('artist-modal-scrim').classList.add('show'));
+  const addTrackBtn = document.getElementById('add-track-btn');
+  if (addTrackBtn) addTrackBtn.addEventListener('click', ()=> document.getElementById('track-modal-scrim').classList.add('show'));
+
+  document.getElementById('project-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('project-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await supabaseClient.from('projects').insert({
+      title: document.getElementById('proj-title').value.trim(),
+      client_name: document.getElementById('proj-client').value.trim(),
+      service: document.getElementById('proj-service').value.trim(),
+      project_type: document.getElementById('proj-type').value,
+      stage: document.getElementById('proj-stage').value,
+      due_date: document.getElementById('proj-due').value || null,
+      value: Number(document.getElementById('proj-value').value || 0),
+      paid_status: document.getElementById('proj-paid').value,
+      notes: document.getElementById('proj-notes').value.trim(),
+    });
+    btn.disabled = false; btn.textContent = 'Save project';
+    if (error){ alert(error.message || "Couldn't save this project."); return; }
+    e.target.reset();
+    document.getElementById('project-modal-scrim').classList.remove('show');
+    await loadProjects();
+  });
+
+  document.getElementById('client-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('client-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await supabaseClient.from('clients').insert({
+      name: document.getElementById('client-name').value.trim(),
+      type: document.getElementById('client-type').value.trim(),
+      phone: document.getElementById('client-phone').value.trim(),
+      email: document.getElementById('client-email').value.trim(),
+      notes: document.getElementById('client-notes').value.trim(),
+    });
+    btn.disabled = false; btn.textContent = 'Save client';
+    if (error){ alert(error.message || "Couldn't save this client."); return; }
+    e.target.reset();
+    document.getElementById('client-modal-scrim').classList.remove('show');
+    await loadClients();
+  });
+
+  document.getElementById('artist-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('artist-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await supabaseClient.from('artists').insert({
+      name: document.getElementById('artist-name').value.trim(),
+      split: document.getElementById('artist-split').value.trim(),
+      contract_status: document.getElementById('artist-status').value,
+      contact: document.getElementById('artist-contact').value.trim(),
+    });
+    btn.disabled = false; btn.textContent = 'Save artist';
+    if (error){ alert(error.message || "Couldn't save this artist."); return; }
+    e.target.reset();
+    document.getElementById('artist-modal-scrim').classList.remove('show');
+    await loadArtists();
+  });
+
+  document.getElementById('track-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('track-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await supabaseClient.from('tracks').insert({
+      title: document.getElementById('track-title').value.trim(),
+      artist_name: document.getElementById('track-artist').value.trim(),
+      isrc: document.getElementById('track-isrc').value.trim(),
+      distributor: document.getElementById('track-distributor').value.trim(),
+      bpm: document.getElementById('track-bpm').value.trim(),
+      key: document.getElementById('track-key').value.trim(),
+      release_date: document.getElementById('track-release').value || null,
+      credits: document.getElementById('track-credits').value.trim(),
+      status: document.getElementById('track-status').value.trim(),
+    });
+    btn.disabled = false; btn.textContent = 'Save track';
+    if (error){ alert(error.message || "Couldn't save this track."); return; }
+    e.target.reset();
+    document.getElementById('track-modal-scrim').classList.remove('show');
+    await loadTracks();
+  });
+
+  // =========================================================
+  // Public feedback page — what a client sees via the shared link.
+  // No login required; runs instead of the normal app when the
+  // URL contains ?feedback=<project id>.
+  // =========================================================
+  (function initPublicFeedbackPage(){
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get('feedback');
+    if (!projectId) return; // normal app flow — nothing to do here
+
+    // Hide everything else, show only the public feedback card
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'none';
+    const page = document.getElementById('public-feedback-page');
+    page.style.display = 'flex';
+
+    let rating = 0;
+    const starsEl = document.getElementById('public-feedback-stars');
+    starsEl.querySelectorAll('span').forEach(star=>{
+      star.addEventListener('click', ()=>{
+        rating = Number(star.dataset.star);
+        starsEl.querySelectorAll('span').forEach(s=>{
+          s.classList.toggle('filled', Number(s.dataset.star) <= rating);
+        });
+      });
+    });
+
+    // Look up the project name for a bit of context (public, read-only-safe
+    // since anon can only ever select nothing from projects directly —
+    // this uses the same public client, so if it fails we just skip it)
+    (async ()=>{
+      try {
+        const anonClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data } = await anonClient.from('projects').select('title, client_name').eq('id', projectId).single();
+        if (data) document.getElementById('public-feedback-project').textContent = `From Brighten Sounds Studio — "${data.title}"`;
+      } catch(e){ /* fine, keep generic text */ }
+    })();
+
+    document.getElementById('public-feedback-submit').addEventListener('click', async ()=>{
+      const btn = document.getElementById('public-feedback-submit');
+      const noteEl = document.getElementById('public-feedback-note');
+      if (!rating){
+        noteEl.textContent = 'Please choose a star rating first.';
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Sending…';
+      const { error } = await supabaseClient.from('feedback').insert({
+        project_id: projectId,
+        client_name: document.getElementById('public-feedback-name').value.trim() || null,
+        rating,
+        comment: document.getElementById('public-feedback-comment').value.trim() || null,
+      });
+      if (error){
+        btn.disabled = false; btn.textContent = 'Submit feedback';
+        noteEl.textContent = "Something went wrong — please try again.";
+        return;
+      }
+      document.getElementById('public-feedback-body').innerHTML =
+        '<div class="cvf-logo"><span class="hr-word on-light" style="font-size:16px;">HE<span class="hr-a on-light"></span>DROOM</span></div>' +
+        '<div style="padding:20px 0; text-align:center; color:#1D8A4E; font-weight:600;">Thank you — your feedback was sent.</div>';
+    });
+  })();
+</script>
+
+</body>
+</html>
