@@ -623,7 +623,7 @@
     .btn{ padding:7px 10px; font-size:12px; }
     .btn-ghost{ display:none; }
     .account-badge .account-role{ display:none; }
-    #logout-btn{ display:inline-block !important; padding:6px 10px; font-size:11px; }
+    #logout-btn, #change-password-btn{ display:inline-block !important; padding:6px 10px; font-size:11px; }
 
     .content{ padding:16px 14px 50px; }
     .grid-4{ grid-template-columns:repeat(2,1fr); gap:10px; }
@@ -697,8 +697,24 @@
         </div>
         <button type="submit" class="login-submit" id="login-submit">Sign in</button>
       </form>
+      <div class="login-switch" style="margin-top:8px;"><a href="#" id="show-forgot">Forgot password?</a></div>
       <div class="login-note">Owner and Assistant accounts each sign in here — access is scoped automatically based on your account.</div>
       <div class="login-switch">New studio assistant? <a href="#" id="show-request">Request access</a></div>
+    </div>
+
+    <!-- Forgot-password form -->
+    <div id="forgot-panel" style="display:none;">
+      <div class="login-error" id="forgot-error"></div>
+      <div class="login-success" id="forgot-success"></div>
+      <form id="forgot-form">
+        <div class="login-field">
+          <label for="forgot-email">Your email</label>
+          <input type="email" id="forgot-email" required placeholder="you@example.com">
+        </div>
+        <button type="submit" class="login-submit" id="forgot-submit">Send reset link</button>
+      </form>
+      <div class="login-note">We'll email you a link to set a new password — works from any device.</div>
+      <div class="login-switch">Remembered it? <a href="#" id="show-login-from-forgot">Back to sign in</a></div>
     </div>
 
     <!-- Request-access form (for a not-yet-created assistant) -->
@@ -862,6 +878,24 @@
   </div>
 </div>
 
+<!-- Change password modal (any logged-in role) -->
+<div class="data-modal-scrim" id="password-modal-scrim">
+  <div class="data-modal">
+    <h3>Change your password</h3>
+    <div class="login-error" id="password-error"></div>
+    <div class="login-success" id="password-success"></div>
+    <form id="password-form">
+      <div class="login-field"><label>New password</label><input type="password" id="new-password" required minlength="6" placeholder="At least 6 characters"></div>
+      <div class="login-field"><label>Confirm new password</label><input type="password" id="confirm-password" required minlength="6" placeholder="Type it again"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="password-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="password-submit">Update password</button>
+      </div>
+    </form>
+    <div class="login-note" style="margin-top:14px;">Once changed, use this new password next time you sign in — from this device or any other.</div>
+  </div>
+</div>
+
 <div id="app-shell">
 <div class="sidebar">
   <div class="brand">
@@ -972,6 +1006,7 @@
       </button>
       <button class="btn btn-ghost" id="search-btn">Search ⌘K</button>
       <button class="btn btn-primary" id="new-btn">+ New Project</button>
+      <button class="btn btn-ghost" id="change-password-btn" title="Change password">Password</button>
       <button class="btn btn-ghost" id="logout-btn" title="Log out">Log out</button>
     </div>
   </div>
@@ -1377,22 +1412,126 @@
     }
   })();
 
-  // ---------- Login screen: toggle between sign-in and request-access ----------
+  // ---------- Login screen: toggle between sign-in, request-access, and forgot-password ----------
   const loginPanel = document.getElementById('login-panel');
   const requestPanel = document.getElementById('request-panel');
+  const forgotPanel = document.getElementById('forgot-panel');
   const loginSub = document.getElementById('login-sub');
+
+  function showLoginPanel(){
+    loginPanel.style.display = 'block';
+    requestPanel.style.display = 'none';
+    forgotPanel.style.display = 'none';
+    loginSub.textContent = 'Studio & Work OS — sign in to continue';
+  }
   document.getElementById('show-request').addEventListener('click', (e)=>{
     e.preventDefault();
     loginPanel.style.display = 'none';
+    forgotPanel.style.display = 'none';
     requestPanel.style.display = 'block';
     loginSub.textContent = 'Request assistant access';
   });
   document.getElementById('show-login').addEventListener('click', (e)=>{
     e.preventDefault();
-    requestPanel.style.display = 'none';
-    loginPanel.style.display = 'block';
-    loginSub.textContent = 'Studio & Work OS — sign in to continue';
+    showLoginPanel();
   });
+  document.getElementById('show-forgot').addEventListener('click', (e)=>{
+    e.preventDefault();
+    loginPanel.style.display = 'none';
+    requestPanel.style.display = 'none';
+    forgotPanel.style.display = 'block';
+    loginSub.textContent = 'Reset your password';
+  });
+  document.getElementById('show-login-from-forgot').addEventListener('click', (e)=>{
+    e.preventDefault();
+    showLoginPanel();
+  });
+
+  // ---------- Forgot password: send a reset email ----------
+  const forgotForm = document.getElementById('forgot-form');
+  const forgotError = document.getElementById('forgot-error');
+  const forgotSuccess = document.getElementById('forgot-success');
+  const forgotSubmit = document.getElementById('forgot-submit');
+  forgotForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    forgotError.classList.remove('show');
+    forgotSuccess.classList.remove('show');
+    forgotSubmit.disabled = true;
+    forgotSubmit.textContent = 'Sending…';
+    const email = document.getElementById('forgot-email').value.trim();
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + location.pathname,
+    });
+    forgotSubmit.disabled = false;
+    forgotSubmit.textContent = 'Send reset link';
+    if (error){
+      forgotError.textContent = error.message || "Couldn't send the reset email — try again.";
+      forgotError.classList.add('show');
+      return;
+    }
+    forgotForm.reset();
+    forgotSuccess.textContent = "Check your email for a reset link — open it on any device to set a new password.";
+    forgotSuccess.classList.add('show');
+  });
+
+  // ---------- Change password (while logged in) ----------
+  const passwordScrim = document.getElementById('password-modal-scrim');
+  const passwordForm = document.getElementById('password-form');
+  const passwordError = document.getElementById('password-error');
+  const passwordSuccess = document.getElementById('password-success');
+  const passwordSubmit = document.getElementById('password-submit');
+
+  document.getElementById('change-password-btn').addEventListener('click', ()=>{
+    passwordError.classList.remove('show');
+    passwordSuccess.classList.remove('show');
+    passwordForm.reset();
+    passwordScrim.classList.add('show');
+  });
+  document.getElementById('password-cancel').addEventListener('click', ()=> passwordScrim.classList.remove('show'));
+  passwordScrim.addEventListener('click', (e)=>{ if (e.target === passwordScrim) passwordScrim.classList.remove('show'); });
+
+  passwordForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    passwordError.classList.remove('show');
+    passwordSuccess.classList.remove('show');
+    const newPw = document.getElementById('new-password').value;
+    const confirmPw = document.getElementById('confirm-password').value;
+    if (newPw !== confirmPw){
+      passwordError.textContent = "Those two passwords don't match.";
+      passwordError.classList.add('show');
+      return;
+    }
+    passwordSubmit.disabled = true;
+    passwordSubmit.textContent = 'Updating…';
+    const { error } = await supabaseClient.auth.updateUser({ password: newPw });
+    passwordSubmit.disabled = false;
+    passwordSubmit.textContent = 'Update password';
+    if (error){
+      passwordError.textContent = error.message || "Couldn't update your password — try again.";
+      passwordError.classList.add('show');
+      return;
+    }
+    passwordSuccess.textContent = "Password updated — use this next time you sign in.";
+    passwordSuccess.classList.add('show');
+    passwordForm.reset();
+    setTimeout(()=> passwordScrim.classList.remove('show'), 1800);
+  });
+
+  // ---------- Handle a password-reset link (redirected back here from the reset email) ----------
+  (async function checkForPasswordRecovery(){
+    if (location.hash.includes('type=recovery')){
+      // Supabase's client automatically picks up the recovery session from the URL;
+      // once a session exists, prompt them straight to set a new password.
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session){
+        showApp();
+        loadAllData();
+        passwordScrim.classList.add('show');
+        passwordSuccess.textContent = "You're in — set a new password below to finish resetting it.";
+        passwordSuccess.classList.add('show');
+      }
+    }
+  })();
 
   // ---------- Request-access form (no login needed to submit) ----------
   const requestForm = document.getElementById('request-form');
