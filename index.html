@@ -1014,7 +1014,7 @@
 <!-- Add Track modal -->
 <div class="data-modal-scrim" id="track-modal-scrim">
   <div class="data-modal">
-    <h3>Add Track</h3>
+    <h3 id="track-modal-title">Add Track</h3>
     <form id="track-form">
       <div class="login-field"><label>Track title</label><input type="text" id="track-title" required placeholder="Track name"></div>
       <div class="login-field"><label>Artist</label><input type="text" id="track-artist" placeholder="Artist name"></div>
@@ -1030,6 +1030,7 @@
       <div class="login-field"><label>Credits</label><input type="text" id="track-credits" placeholder="e.g. Mix & Master: Kado"></div>
       <div class="login-field"><label>Status</label><input type="text" id="track-status" placeholder="e.g. Mastering, Released"></div>
       <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="track-delete" style="display:none; color:#C3492E;">Delete</button>
         <button type="button" class="btn btn-ghost" id="track-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary" id="track-submit">Save track</button>
       </div>
@@ -1217,19 +1218,19 @@
       <div class="grid grid-4">
         <div class="card stat-card"><div class="bar"></div>
           <div class="label">Active Projects</div>
-          <div class="value">0</div>
+          <div class="value" id="dash-active-projects">0</div>
         </div>
         <div class="card stat-card"><div class="bar"></div>
           <div class="label">Outstanding Invoices</div>
-          <div class="value">TSh 0</div>
+          <div class="value" id="dash-outstanding">TSh 0</div>
         </div>
         <div class="card stat-card"><div class="bar"></div>
           <div class="label">Revenue — this month</div>
-          <div class="value">TSh 0</div>
+          <div class="value" id="dash-revenue">TSh 0</div>
         </div>
         <div class="card stat-card"><div class="bar"></div>
           <div class="label">Deadlines — 7 days</div>
-          <div class="value">0</div>
+          <div class="value" id="dash-deadlines">0</div>
         </div>
       </div>
 
@@ -1237,36 +1238,36 @@
       <div class="card">
         <div class="pipeline">
           <div class="stage" style="--stage-color:#8FA0C0">
-            <div class="stage-head"><span class="name">Received</span><span class="n">0</span></div>
-            <div class="empty-note">No projects yet</div>
+            <div class="stage-head"><span class="name">Received</span><span class="n" id="dash-stage-count-received">0</span></div>
+            <div id="dash-stage-jobs-received"><div class="empty-note">No projects yet</div></div>
           </div>
           <div class="stage" style="--stage-color:var(--orange)">
-            <div class="stage-head"><span class="name">In Progress</span><span class="n">0</span></div>
-            <div class="empty-note">No projects yet</div>
+            <div class="stage-head"><span class="name">In Progress</span><span class="n" id="dash-stage-count-in_progress">0</span></div>
+            <div id="dash-stage-jobs-in_progress"><div class="empty-note">No projects yet</div></div>
           </div>
           <div class="stage" style="--stage-color:#13294F">
-            <div class="stage-head"><span class="name">Delivered</span><span class="n">0</span></div>
-            <div class="empty-note">No projects yet</div>
+            <div class="stage-head"><span class="name">Delivered</span><span class="n" id="dash-stage-count-delivered">0</span></div>
+            <div id="dash-stage-jobs-delivered"><div class="empty-note">No projects yet</div></div>
           </div>
           <div class="stage" style="--stage-color:#9A7514">
-            <div class="stage-head"><span class="name">Feedback</span><span class="n">0</span></div>
-            <div class="empty-note">No projects yet</div>
+            <div class="stage-head"><span class="name">Feedback</span><span class="n" id="dash-stage-count-feedback">0</span></div>
+            <div id="dash-stage-jobs-feedback"><div class="empty-note">No projects yet</div></div>
           </div>
           <div class="stage" style="--stage-color:#1D8A4E">
-            <div class="stage-head"><span class="name">Complete</span><span class="n">0</span></div>
-            <div class="empty-note">No projects yet</div>
+            <div class="stage-head"><span class="name">Complete</span><span class="n" id="dash-stage-count-complete">0</span></div>
+            <div id="dash-stage-jobs-complete"><div class="empty-note">No projects yet</div></div>
           </div>
         </div>
       </div>
 
       <div class="grid grid-2" style="margin-top:20px;">
         <div class="card">
-          <h3>Upcoming <span class="more">View calendar</span></h3>
-          <div class="empty-note">Nothing scheduled yet</div>
+          <h3>Upcoming <span class="more" id="dash-view-calendar">View calendar</span></h3>
+          <div id="dash-upcoming"><div class="empty-note">Nothing scheduled yet</div></div>
         </div>
         <div class="card">
           <h3>Latest feedback</h3>
-          <div class="empty-note">No feedback received yet</div>
+          <div id="dash-latest-feedback"><div class="empty-note">No feedback received yet</div></div>
         </div>
       </div>
     </div>
@@ -1469,7 +1470,7 @@
 
     <!-- ================= CALENDAR ================= -->
     <div class="view" id="view-calendar">
-      <div class="card">
+      <div class="card" id="calendar-card">
         <div class="empty-note">Nothing scheduled yet.</div>
       </div>
     </div>
@@ -2130,11 +2131,71 @@
 
     renderInvoicesAndFinances(list);
     populateFeedbackProjectSelect(list);
+    renderDashboard(list);
+  }
 
-    // Dashboard summary
+  function renderDashboard(list){
+    // Stat cards
     const activeCount = list.filter(p => p.stage !== 'complete').length;
-    const dashActive = document.querySelector('#view-dashboard .stat-card .value');
-    if (dashActive) dashActive.textContent = activeCount;
+    document.getElementById('dash-active-projects').textContent = activeCount;
+
+    const billable = list.filter(p => Number(p.value) > 0 && p.project_type === 'studio');
+    const outstanding = billable.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
+    document.getElementById('dash-outstanding').textContent = money(outstanding);
+
+    const now = new Date();
+    const monthRevenue = list
+      .filter(p => p.paid_status === 'paid' && p.created_at && new Date(p.created_at).getMonth() === now.getMonth() && new Date(p.created_at).getFullYear() === now.getFullYear())
+      .reduce((s,p)=>s+Number(p.value||0),0);
+    document.getElementById('dash-revenue').textContent = money(monthRevenue);
+
+    const in7Days = new Date(now); in7Days.setDate(now.getDate() + 7);
+    const upcoming = list
+      .filter(p => p.due_date && p.stage !== 'complete')
+      .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
+      .filter(p => p.dueObj >= now && p.dueObj <= in7Days)
+      .sort((a,b) => a.dueObj - b.dueObj);
+    document.getElementById('dash-deadlines').textContent = upcoming.length;
+
+    // Pipeline snapshot (mirrors the Projects view, condensed)
+    ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
+      const inStage = list.filter(p => p.stage === stage);
+      document.getElementById('dash-stage-count-' + stage).textContent = inStage.length;
+      const container = document.getElementById('dash-stage-jobs-' + stage);
+      container.innerHTML = inStage.length
+        ? inStage.slice(0, 4).map(p => `
+            <div class="job">
+              <div class="jtitle">${p.title}</div>
+              <div class="jclient">${p.client_name || ''}</div>
+            </div>`).join('') + (inStage.length > 4 ? `<div class="sub-cell" style="text-align:center; padding:4px;">+${inStage.length - 4} more</div>` : '')
+        : '<div class="empty-note">No projects yet</div>';
+    });
+
+    // Upcoming deadlines (all due dates in the next 7 days, any stage)
+    const upcomingCard = document.getElementById('dash-upcoming');
+    upcomingCard.innerHTML = upcoming.length
+      ? upcoming.map(p => `
+          <div class="cal-row">
+            <div class="cal-date"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
+            <div class="cal-info"><div class="t">${p.title}</div><div class="s">${p.client_name || ''}</div></div>
+          </div>`).join('')
+      : '<div class="empty-note">Nothing scheduled yet</div>';
+
+    // Full calendar — every project with a due date, any time frame, soonest first
+    const calCard = document.getElementById('calendar-card');
+    if (calCard){
+      const allDated = list
+        .filter(p => p.due_date)
+        .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
+        .sort((a,b) => a.dueObj - b.dueObj);
+      calCard.innerHTML = allDated.length
+        ? allDated.map(p => `
+            <div class="cal-row">
+              <div class="cal-date"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
+              <div class="cal-info"><div class="t">${p.title}</div><div class="s">${p.client_name || ''} · ${stageLabel[p.stage]}</div></div>
+            </div>`).join('')
+        : '<div class="empty-note">Nothing scheduled yet.</div>';
+    }
   }
 
   function renderInvoicesAndFinances(projects){
@@ -2144,14 +2205,16 @@
 
     invCard.innerHTML = billable.length
       ? `<table>
-          <tr><th>Project</th><th>Client</th><th>Amount</th><th>Status</th><th></th></tr>
+          <tr><th>Project</th><th>Client</th><th>Amount</th><th>Due</th><th>Status</th><th></th></tr>
           ${billable.map(p => `
             <tr class="rowhover">
               <td class="name-cell">${p.title}</td>
               <td>${p.client_name || '—'}</td>
               <td>${money(p.value)}</td>
+              <td class="sub-cell">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
               <td><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
               <td style="white-space:nowrap;">
+                <button class="btn btn-ghost invoice-edit-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">Edit</button>
                 <button class="btn btn-ghost invoice-view-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">View</button>
                 <button class="btn btn-ghost invoice-copy-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">Copy link</button>
               </td>
@@ -2159,6 +2222,9 @@
         </table>`
       : '<div class="empty-note">No invoices yet — an invoice appears automatically here for any project with a value greater than zero.</div>';
 
+    invCard.querySelectorAll('.invoice-edit-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> openProjectForEdit(btn.dataset.id));
+    });
     invCard.querySelectorAll('.invoice-view-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         window.open(`${location.origin}${location.pathname}?invoice=${btn.dataset.id}`, '_blank');
@@ -2233,17 +2299,21 @@
   }
 
   // ---- Tracks (music vault) — expandable rows ----
+  let tracksCache = [];
+  let editingTrackId = null;
+
   async function loadTracks(){
     const { data } = await supabaseClient.from('tracks').select('*').order('created_at', { ascending: false });
     const list = data || [];
+    tracksCache = list;
     const card = document.getElementById('tracks-table-card');
     if (!list.length){
       card.innerHTML = '<div class="empty-note">No tracks in the vault yet.</div>';
       return;
     }
     card.innerHTML = list.map((t, i) => `
-      <div class="job" style="margin-bottom:8px; cursor:pointer;" onclick="document.getElementById('track-detail-${i}').classList.toggle('show-track')">
-        <div class="jtitle">${t.title} <span class="sub-cell">— ${t.artist_name || 'Unknown artist'}</span></div>
+      <div class="job" style="margin-bottom:8px;">
+        <div class="jtitle" style="cursor:pointer;" data-toggle-track="${i}">${t.title} <span class="sub-cell">— ${t.artist_name || 'Unknown artist'}</span></div>
         <div id="track-detail-${i}" class="track-detail">
           <div class="meta-grid" style="margin-top:10px;">
             <div class="meta-cell"><div class="k">ISRC</div><div class="v">${t.isrc || '—'}</div></div>
@@ -2254,8 +2324,21 @@
             <div class="meta-cell"><div class="k">Credits</div><div class="v">${t.credits || '—'}</div></div>
             <div class="meta-cell"><div class="k">Status</div><div class="v">${t.status || '—'}</div></div>
           </div>
+          <button class="btn btn-ghost track-edit-btn" data-id="${t.id}" style="margin-top:10px; padding:6px 12px; font-size:12px;">Edit track</button>
         </div>
       </div>`).join('');
+
+    card.querySelectorAll('[data-toggle-track]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        document.getElementById('track-detail-' + el.dataset.toggleTrack).classList.toggle('show-track');
+      });
+    });
+    card.querySelectorAll('.track-edit-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openTrackForEdit(btn.dataset.id);
+      });
+    });
   }
 
   // ---- Feedback (received list + link generator) ----
@@ -2275,8 +2358,18 @@
           </div>`).join('')
       : '<div class="empty-note">No feedback received yet — once clients start submitting, real entries will show up here.</div>';
 
-    // update dashboard "Latest feedback" card too
-    const dashCard = document.querySelectorAll('#view-dashboard .card')[2] || null;
+    // Dashboard "Latest feedback" — most recent 3
+    const dashCard = document.getElementById('dash-latest-feedback');
+    if (dashCard){
+      dashCard.innerHTML = list.length
+        ? list.slice(0, 3).map(f => `
+            <div style="margin-bottom:12px;">
+              <div class="stars">${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}</div>
+              <div class="quote">"${(f.comment || 'No written comment.').slice(0, 80)}${f.comment && f.comment.length > 80 ? '…' : ''}"</div>
+              <div class="sub-cell" style="margin-top:2px;">${f.client_name || 'Anonymous'} · ${f.projects ? f.projects.title : ''}</div>
+            </div>`).join('')
+        : '<div class="empty-note">No feedback received yet</div>';
+    }
   }
 
   // ---- Tasks ----
@@ -2381,6 +2474,43 @@
   wireModal('track-modal-scrim', 'track-cancel');
   wireModal('task-modal-scrim', 'task-cancel');
   document.getElementById('project-cancel').addEventListener('click', resetProjectModal);
+  document.getElementById('track-cancel').addEventListener('click', resetTrackModal);
+
+  function resetTrackModal(){
+    editingTrackId = null;
+    document.getElementById('track-modal-title').textContent = 'Add Track';
+    document.getElementById('track-delete').style.display = 'none';
+    document.getElementById('track-form').reset();
+  }
+  function openTrackForEdit(id){
+    const t = tracksCache.find(x => x.id === id);
+    if (!t) return;
+    editingTrackId = id;
+    document.getElementById('track-modal-title').textContent = 'Edit Track';
+    document.getElementById('track-delete').style.display = '';
+    document.getElementById('track-title').value = t.title || '';
+    document.getElementById('track-artist').value = t.artist_name || '';
+    document.getElementById('track-isrc').value = t.isrc || '';
+    document.getElementById('track-distributor').value = t.distributor || '';
+    document.getElementById('track-bpm').value = t.bpm || '';
+    document.getElementById('track-key').value = t.key || '';
+    document.getElementById('track-release').value = t.release_date || '';
+    document.getElementById('track-credits').value = t.credits || '';
+    document.getElementById('track-status').value = t.status || '';
+    document.getElementById('track-modal-scrim').classList.add('show');
+  }
+  document.getElementById('track-delete').addEventListener('click', async ()=>{
+    if (!editingTrackId) return;
+    if (!confirm('Delete this track? This cannot be undone.')) return;
+    const btn = document.getElementById('track-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('tracks').delete().eq('id', editingTrackId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this track."); return; }
+    document.getElementById('track-modal-scrim').classList.remove('show');
+    resetTrackModal();
+    await loadTracks();
+  });
 
   function resetProjectModal(){
     editingProjectId = null;
@@ -2452,6 +2582,10 @@
     document.getElementById('artist-modal-scrim').classList.add('show');
   }
 
+  document.getElementById('dash-view-calendar').addEventListener('click', ()=>{
+    document.querySelector('.nav-item[data-view="calendar"]').click();
+  });
+
   document.getElementById('new-btn').addEventListener('click', ()=>{
     resetProjectModal();
     document.getElementById('project-modal-scrim').classList.add('show');
@@ -2467,7 +2601,10 @@
     document.getElementById('artist-modal-scrim').classList.add('show');
   });
   const addTrackBtn = document.getElementById('add-track-btn');
-  if (addTrackBtn) addTrackBtn.addEventListener('click', ()=> document.getElementById('track-modal-scrim').classList.add('show'));
+  if (addTrackBtn) addTrackBtn.addEventListener('click', ()=>{
+    resetTrackModal();
+    document.getElementById('track-modal-scrim').classList.add('show');
+  });
   const addTaskBtn = document.getElementById('add-task-btn');
   if (addTaskBtn) addTaskBtn.addEventListener('click', ()=>{
     populateTaskProjectSelect();
@@ -2617,7 +2754,7 @@
     e.preventDefault();
     const btn = document.getElementById('track-submit');
     btn.disabled = true; btn.textContent = 'Saving…';
-    const { error } = await supabaseClient.from('tracks').insert({
+    const payload = {
       title: document.getElementById('track-title').value.trim(),
       artist_name: document.getElementById('track-artist').value.trim(),
       isrc: document.getElementById('track-isrc').value.trim(),
@@ -2627,11 +2764,14 @@
       release_date: document.getElementById('track-release').value || null,
       credits: document.getElementById('track-credits').value.trim(),
       status: document.getElementById('track-status').value.trim(),
-    });
+    };
+    const { error } = editingTrackId
+      ? await supabaseClient.from('tracks').update(payload).eq('id', editingTrackId)
+      : await supabaseClient.from('tracks').insert(payload);
     btn.disabled = false; btn.textContent = 'Save track';
     if (error){ alert(error.message || "Couldn't save this track."); return; }
-    e.target.reset();
     document.getElementById('track-modal-scrim').classList.remove('show');
+    resetTrackModal();
     await loadTracks();
   });
 
