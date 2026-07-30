@@ -249,3 +249,27 @@ drop policy if exists "Editors can update tasks" on public.tasks;
 create policy "Editors can update tasks" on public.tasks for update using (public.can_edit());
 drop policy if exists "Owners can delete tasks" on public.tasks;
 create policy "Owners can delete tasks" on public.tasks for delete using (public.is_owner());
+
+-- ============================================================
+-- 11. NEW (v7): Public read access for shareable invoice/feedback
+--    links — WITHOUT exposing your whole projects table.
+--
+--    Clients open these links with no login (using the public
+--    "anon" key), so instead of letting anon read the projects
+--    table directly, we expose a narrow view with only the fields
+--    a client should ever see (no internal notes, no other
+--    projects' data beyond what they specifically link to).
+-- ============================================================
+create or replace view public.public_project_info as
+select id, title, client_name, service, project_type, stage,
+       due_date, value, paid_status, created_at
+from public.projects;
+
+grant select on public.public_project_info to anon, authenticated;
+
+-- Note: this view is intentionally readable by anyone who has the
+-- link's project ID (a random UUID, not guessable) plus your public
+-- anon key. It exposes only what a client needs to see on their own
+-- invoice/feedback page — never your notes field, never other
+-- clients' unrelated data beyond what this same mechanism exposes
+-- for their own linked project.

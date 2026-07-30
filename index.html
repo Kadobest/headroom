@@ -454,6 +454,13 @@
   .inv-total-row.grand{ border-top:2px solid var(--navy); margin-top:4px; padding-top:10px; font-weight:700; color:var(--navy); font-size:16px; }
   .inv-pay{ background:#F5F6F8; border-radius:8px; padding:14px 16px; }
 
+  @media print{
+    .no-print{ display:none !important; }
+    body *{ visibility:hidden; }
+    #public-invoice-page, #public-invoice-page *{ visibility:visible; }
+    #public-invoice-page{ position:absolute; left:0; top:0; padding:0; background:white !important; }
+  }
+
   /* ---------- Client-facing feedback form ---------- */
   .client-view-frame{
     background:var(--paper); border:1px solid #E3E6EC; border-radius:14px;
@@ -774,6 +781,19 @@
   </div>
 </div>
 
+<!-- Public invoice page — what a client sees when they open a shared invoice link.
+     No login involved; shown instead of everything else when the URL has ?invoice=... -->
+<div id="public-invoice-page" style="display:none; min-height:100vh; align-items:flex-start; justify-content:center; background:var(--paper); padding:32px 16px;">
+  <div style="width:100%; max-width:640px;">
+    <div class="invoice-doc" id="public-invoice-doc">
+      <div class="empty-note">Loading invoice…</div>
+    </div>
+    <div style="text-align:center; margin-top:16px;" class="no-print">
+      <button class="btn btn-primary" id="public-invoice-print">Print / Save as PDF</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-screen">
   <div class="login-card">
     <span class="hr-word on-light" style="font-size:26px;">HE<span class="hr-a on-light"></span>DROOM</span>
@@ -928,15 +948,15 @@
   </div>
 </div>
 
-<!-- Add Client modal -->
+<!-- Add/Edit Client modal -->
 <div class="data-modal-scrim" id="client-modal-scrim">
   <div class="data-modal">
-    <h3>Add Client</h3>
+    <h3 id="client-modal-title">Add Client</h3>
     <form id="client-form">
-      <div class="login-field"><label>Name (person)</label><input type="text" id="client-name" required placeholder="e.g. Kado"></div>
+      <div class="login-field"><label>Name</label><input type="text" id="client-name" required placeholder="A person's name, or a company/label name if the client IS the company"></div>
       <div class="login-field"><label>Type</label><input type="text" id="client-type" placeholder="e.g. Label artist, Corporate, Events"></div>
       <div class="field-row">
-        <div class="login-field"><label>Company / Label</label><input type="text" id="client-company-name" placeholder="e.g. Brighten Sounds"></div>
+        <div class="login-field"><label>Works for (company/label, optional)</label><input type="text" id="client-company-name" placeholder="Leave blank if the name above IS the company"></div>
         <div class="login-field"><label>Company type</label>
           <select id="client-company-type">
             <option value="">—</option>
@@ -952,6 +972,7 @@
       </div>
       <div class="login-field"><label>Notes (optional)</label><input type="text" id="client-notes" placeholder="History, preferences, testimonials, etc."></div>
       <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="client-delete" style="display:none; color:#C3492E;">Delete</button>
         <button type="button" class="btn btn-ghost" id="client-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary" id="client-submit">Save client</button>
       </div>
@@ -959,10 +980,10 @@
   </div>
 </div>
 
-<!-- Add Artist modal -->
+<!-- Add/Edit Artist modal -->
 <div class="data-modal-scrim" id="artist-modal-scrim">
   <div class="data-modal">
-    <h3>Add Artist</h3>
+    <h3 id="artist-modal-title">Add Artist</h3>
     <form id="artist-form">
       <div class="login-field"><label>Name</label><input type="text" id="artist-name" required placeholder="Artist name"></div>
       <div class="login-field"><label>Split</label><input type="text" id="artist-split" placeholder="e.g. 50 / 50, Session — flat fee"></div>
@@ -982,6 +1003,7 @@
       </div>
       <div class="login-field"><label>Contact</label><input type="text" id="artist-contact" placeholder="Phone or email"></div>
       <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="artist-delete" style="display:none; color:#C3492E;">Delete</button>
         <button type="button" class="btn btn-ghost" id="artist-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary" id="artist-submit">Save artist</button>
       </div>
@@ -1563,8 +1585,20 @@
   const loginSubmit = document.getElementById('login-submit');
   const logoutBtn = document.getElementById('popover-logout');
 
-  function showApp(){ loginScreen.style.display = 'none'; appShell.style.display = 'flex'; }
-  function showLogin(){ loginScreen.style.display = 'flex'; appShell.style.display = 'none'; }
+  // If this page was opened via a shareable public link (feedback, invoice, etc.),
+  // the normal login/app flow must never show itself — this flag stops that,
+  // regardless of the order async auth checks happen to finish in.
+  const publicLinkParams = new URLSearchParams(location.search);
+  const isPublicLinkMode = publicLinkParams.has('feedback') || publicLinkParams.has('invoice');
+
+  function showApp(){
+    if (isPublicLinkMode) return;
+    loginScreen.style.display = 'none'; appShell.style.display = 'flex';
+  }
+  function showLogin(){
+    if (isPublicLinkMode) return;
+    loginScreen.style.display = 'flex'; appShell.style.display = 'none';
+  }
 
   async function loadProfileAndEnter(user){
     const { data, error } = await supabaseClient
@@ -1608,14 +1642,18 @@
   });
 
   // On load, resume an existing session if there is one
-  (async ()=>{
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session && session.user){
-      await loadProfileAndEnter(session.user);
-    } else {
-      showLogin();
-    }
-  })();
+  // (skipped entirely in public-link mode — a client opening a feedback
+  // or invoice link should never trigger an owner/assistant auth check)
+  if (!isPublicLinkMode){
+    (async ()=>{
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session && session.user){
+        await loadProfileAndEnter(session.user);
+      } else {
+        showLogin();
+      }
+    })();
+  }
 
   // ---------- Login screen: toggle between sign-in, request-access, and forgot-password ----------
   const loginPanel = document.getElementById('login-panel');
@@ -2106,16 +2144,34 @@
 
     invCard.innerHTML = billable.length
       ? `<table>
-          <tr><th>Project</th><th>Client</th><th>Amount</th><th>Status</th></tr>
+          <tr><th>Project</th><th>Client</th><th>Amount</th><th>Status</th><th></th></tr>
           ${billable.map(p => `
             <tr class="rowhover">
               <td class="name-cell">${p.title}</td>
               <td>${p.client_name || '—'}</td>
               <td>${money(p.value)}</td>
               <td><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-ghost invoice-view-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">View</button>
+                <button class="btn btn-ghost invoice-copy-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">Copy link</button>
+              </td>
             </tr>`).join('')}
         </table>`
       : '<div class="empty-note">No invoices yet — an invoice appears automatically here for any project with a value greater than zero.</div>';
+
+    invCard.querySelectorAll('.invoice-view-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        window.open(`${location.origin}${location.pathname}?invoice=${btn.dataset.id}`, '_blank');
+      });
+    });
+    invCard.querySelectorAll('.invoice-copy-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const link = `${location.origin}${location.pathname}?invoice=${btn.dataset.id}`;
+        navigator.clipboard?.writeText(link);
+        btn.textContent = 'Copied!';
+        setTimeout(()=>{ btn.textContent = 'Copy link'; }, 1500);
+      });
+    });
 
     const clientWork = projects.filter(p => p.project_type === 'studio' && Number(p.value) > 0);
     const labelWork = projects.filter(p => p.project_type === 'label');
@@ -2137,29 +2193,43 @@
   }
 
   // ---- Clients ----
+  let clientsCache = [];
+  let editingClientId = null;
+
   async function loadClients(){
     const { data } = await supabaseClient.from('clients').select('*').order('created_at', { ascending: false });
     const list = data || [];
+    clientsCache = list;
     const card = document.getElementById('clients-table-card');
     card.innerHTML = list.length
       ? `<table>
           <tr><th>Name</th><th>Type</th><th>Company / Label</th><th>Phone</th><th>Email</th><th>Notes</th></tr>
-          ${list.map(c => `<tr class="rowhover"><td class="name-cell">${c.name}</td><td>${c.type||'—'}</td><td>${c.company_name ? c.company_name + (c.company_type ? ' <span class="sub-cell">('+c.company_type+')</span>' : '') : '—'}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td><td class="sub-cell">${c.notes||'—'}</td></tr>`).join('')}
+          ${list.map(c => `<tr class="rowhover" data-client-id="${c.id}" style="cursor:pointer;"><td class="name-cell">${c.name}</td><td>${c.type||'—'}</td><td>${c.company_name ? c.company_name + (c.company_type ? ' <span class="sub-cell">('+c.company_type+')</span>' : '') : '—'}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td><td class="sub-cell">${c.notes||'—'}</td></tr>`).join('')}
         </table>`
       : '<div class="empty-note">No clients yet — click "+ Add Client" to add one, including clients you worked with before Headroom.</div>';
+    card.querySelectorAll('tr[data-client-id]').forEach(el=>{
+      el.addEventListener('click', ()=> openClientForEdit(el.dataset.clientId));
+    });
   }
+
+  let artistsCache = [];
+  let editingArtistId = null;
 
   // ---- Artists (roster) ----
   async function loadArtists(){
     const { data } = await supabaseClient.from('artists').select('*').order('created_at', { ascending: false });
     const list = data || [];
+    artistsCache = list;
     const card = document.getElementById('artists-table-card');
     card.innerHTML = list.length
       ? `<table>
           <tr><th>Artist</th><th>Split</th><th>Company / Label</th><th>Contract</th><th>Contact</th></tr>
-          ${list.map(a => `<tr class="rowhover"><td class="name-cell">${a.name}</td><td>${a.split||'—'}</td><td>${a.company_name ? a.company_name + (a.company_type ? ' <span class="sub-cell">('+a.company_type+')</span>' : '') : '—'}</td><td><span class="pill signed">${a.contract_status||'—'}</span></td><td>${a.contact||'—'}</td></tr>`).join('')}
+          ${list.map(a => `<tr class="rowhover" data-artist-id="${a.id}" style="cursor:pointer;"><td class="name-cell">${a.name}</td><td>${a.split||'—'}</td><td>${a.company_name ? a.company_name + (a.company_type ? ' <span class="sub-cell">('+a.company_type+')</span>' : '') : '—'}</td><td><span class="pill signed">${a.contract_status||'—'}</span></td><td>${a.contact||'—'}</td></tr>`).join('')}
         </table>`
       : '<div class="empty-note">No artists on the roster yet.</div>';
+    card.querySelectorAll('tr[data-artist-id]').forEach(el=>{
+      el.addEventListener('click', ()=> openArtistForEdit(el.dataset.artistId));
+    });
   }
 
   // ---- Tracks (music vault) — expandable rows ----
@@ -2306,6 +2376,8 @@
   wireModal('project-modal-scrim', 'project-cancel');
   wireModal('client-modal-scrim', 'client-cancel');
   wireModal('artist-modal-scrim', 'artist-cancel');
+  document.getElementById('client-cancel').addEventListener('click', resetClientModal);
+  document.getElementById('artist-cancel').addEventListener('click', resetArtistModal);
   wireModal('track-modal-scrim', 'track-cancel');
   wireModal('task-modal-scrim', 'task-cancel');
   document.getElementById('project-cancel').addEventListener('click', resetProjectModal);
@@ -2337,20 +2409,95 @@
     document.getElementById('project-modal-scrim').classList.add('show');
   }
 
+  function resetClientModal(){
+    editingClientId = null;
+    document.getElementById('client-modal-title').textContent = 'Add Client';
+    document.getElementById('client-delete').style.display = 'none';
+    document.getElementById('client-form').reset();
+  }
+  function openClientForEdit(id){
+    const c = clientsCache.find(x => x.id === id);
+    if (!c) return;
+    editingClientId = id;
+    document.getElementById('client-modal-title').textContent = 'Edit Client';
+    document.getElementById('client-delete').style.display = '';
+    document.getElementById('client-name').value = c.name || '';
+    document.getElementById('client-type').value = c.type || '';
+    document.getElementById('client-company-name').value = c.company_name || '';
+    document.getElementById('client-company-type').value = c.company_type || '';
+    document.getElementById('client-phone').value = c.phone || '';
+    document.getElementById('client-email').value = c.email || '';
+    document.getElementById('client-notes').value = c.notes || '';
+    document.getElementById('client-modal-scrim').classList.add('show');
+  }
+
+  function resetArtistModal(){
+    editingArtistId = null;
+    document.getElementById('artist-modal-title').textContent = 'Add Artist';
+    document.getElementById('artist-delete').style.display = 'none';
+    document.getElementById('artist-form').reset();
+  }
+  function openArtistForEdit(id){
+    const a = artistsCache.find(x => x.id === id);
+    if (!a) return;
+    editingArtistId = id;
+    document.getElementById('artist-modal-title').textContent = 'Edit Artist';
+    document.getElementById('artist-delete').style.display = '';
+    document.getElementById('artist-name').value = a.name || '';
+    document.getElementById('artist-split').value = a.split || '';
+    document.getElementById('artist-company-name').value = a.company_name || '';
+    document.getElementById('artist-company-type').value = a.company_type || '';
+    document.getElementById('artist-status').value = a.contract_status || 'Signed';
+    document.getElementById('artist-contact').value = a.contact || '';
+    document.getElementById('artist-modal-scrim').classList.add('show');
+  }
+
   document.getElementById('new-btn').addEventListener('click', ()=>{
     resetProjectModal();
     document.getElementById('project-modal-scrim').classList.add('show');
   });
   const addClientBtn = document.getElementById('add-client-btn');
-  if (addClientBtn) addClientBtn.addEventListener('click', ()=> document.getElementById('client-modal-scrim').classList.add('show'));
+  if (addClientBtn) addClientBtn.addEventListener('click', ()=>{
+    resetClientModal();
+    document.getElementById('client-modal-scrim').classList.add('show');
+  });
   const addArtistBtn = document.getElementById('add-artist-btn');
-  if (addArtistBtn) addArtistBtn.addEventListener('click', ()=> document.getElementById('artist-modal-scrim').classList.add('show'));
+  if (addArtistBtn) addArtistBtn.addEventListener('click', ()=>{
+    resetArtistModal();
+    document.getElementById('artist-modal-scrim').classList.add('show');
+  });
   const addTrackBtn = document.getElementById('add-track-btn');
   if (addTrackBtn) addTrackBtn.addEventListener('click', ()=> document.getElementById('track-modal-scrim').classList.add('show'));
   const addTaskBtn = document.getElementById('add-task-btn');
   if (addTaskBtn) addTaskBtn.addEventListener('click', ()=>{
     populateTaskProjectSelect();
     document.getElementById('task-modal-scrim').classList.add('show');
+  });
+
+  document.getElementById('client-delete').addEventListener('click', async ()=>{
+    if (!editingClientId) return;
+    if (!confirm('Delete this client? This cannot be undone.')) return;
+    const btn = document.getElementById('client-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('clients').delete().eq('id', editingClientId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this client."); return; }
+    document.getElementById('client-modal-scrim').classList.remove('show');
+    resetClientModal();
+    await loadClients();
+  });
+
+  document.getElementById('artist-delete').addEventListener('click', async ()=>{
+    if (!editingArtistId) return;
+    if (!confirm('Delete this artist? This cannot be undone.')) return;
+    const btn = document.getElementById('artist-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('artists').delete().eq('id', editingArtistId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this artist."); return; }
+    document.getElementById('artist-modal-scrim').classList.remove('show');
+    resetArtistModal();
+    await loadArtists();
   });
 
   document.getElementById('project-delete').addEventListener('click', async ()=>{
@@ -2425,7 +2572,7 @@
     e.preventDefault();
     const btn = document.getElementById('client-submit');
     btn.disabled = true; btn.textContent = 'Saving…';
-    const { error } = await supabaseClient.from('clients').insert({
+    const payload = {
       name: document.getElementById('client-name').value.trim(),
       type: document.getElementById('client-type').value.trim(),
       company_name: document.getElementById('client-company-name').value.trim(),
@@ -2433,11 +2580,14 @@
       phone: document.getElementById('client-phone').value.trim(),
       email: document.getElementById('client-email').value.trim(),
       notes: document.getElementById('client-notes').value.trim(),
-    });
+    };
+    const { error } = editingClientId
+      ? await supabaseClient.from('clients').update(payload).eq('id', editingClientId)
+      : await supabaseClient.from('clients').insert(payload);
     btn.disabled = false; btn.textContent = 'Save client';
     if (error){ alert(error.message || "Couldn't save this client."); return; }
-    e.target.reset();
     document.getElementById('client-modal-scrim').classList.remove('show');
+    resetClientModal();
     await loadClients();
   });
 
@@ -2445,18 +2595,21 @@
     e.preventDefault();
     const btn = document.getElementById('artist-submit');
     btn.disabled = true; btn.textContent = 'Saving…';
-    const { error } = await supabaseClient.from('artists').insert({
+    const payload = {
       name: document.getElementById('artist-name').value.trim(),
       split: document.getElementById('artist-split').value.trim(),
       company_name: document.getElementById('artist-company-name').value.trim(),
       company_type: document.getElementById('artist-company-type').value || null,
       contract_status: document.getElementById('artist-status').value,
       contact: document.getElementById('artist-contact').value.trim(),
-    });
+    };
+    const { error } = editingArtistId
+      ? await supabaseClient.from('artists').update(payload).eq('id', editingArtistId)
+      : await supabaseClient.from('artists').insert(payload);
     btn.disabled = false; btn.textContent = 'Save artist';
     if (error){ alert(error.message || "Couldn't save this artist."); return; }
-    e.target.reset();
     document.getElementById('artist-modal-scrim').classList.remove('show');
+    resetArtistModal();
     await loadArtists();
   });
 
@@ -2532,7 +2685,7 @@
     (async ()=>{
       try {
         const anonClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const { data } = await anonClient.from('projects').select('title, client_name').eq('id', projectId).single();
+        const { data } = await anonClient.from('public_project_info').select('title, client_name').eq('id', projectId).single();
         if (data) document.getElementById('public-feedback-project').textContent = `From Brighten Sounds Studio — "${data.title}"`;
       } catch(e){ /* fine, keep generic text */ }
     })();
@@ -2560,6 +2713,70 @@
         '<div class="cvf-logo"><span class="hr-word on-light" style="font-size:16px;">HE<span class="hr-a on-light"></span>DROOM</span></div>' +
         '<div style="padding:20px 0; text-align:center; color:#1D8A4E; font-weight:600;">Thank you — your feedback was sent.</div>';
     });
+  })();
+
+  // ---------- Public invoice page (shared link, no login) ----------
+  (async function initPublicInvoicePage(){
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get('invoice');
+    if (!projectId) return;
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'none';
+    const page = document.getElementById('public-invoice-page');
+    page.style.display = 'flex';
+    const doc = document.getElementById('public-invoice-doc');
+
+    try {
+      const anonClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data: p, error } = await anonClient.from('public_project_info').select('*').eq('id', projectId).single();
+      if (error || !p){
+        doc.innerHTML = '<div class="empty-note">This invoice link is no longer valid.</div>';
+        return;
+      }
+      const shortId = p.id.slice(0, 8).toUpperCase();
+      doc.innerHTML = `
+        <div class="inv-head">
+          <div class="inv-brand">
+            <div class="inv-mark"><span class="hr-word on-light" style="font-size:18px;">HE<span class="hr-a on-light"></span>DROOM</span></div>
+            <div class="inv-sub">Brighten Sounds Studio · Dar es Salaam, Tanzania</div>
+            <div class="inv-sub">Yusuph Hussein Kadondoro (Kado Best)</div>
+          </div>
+          <div class="inv-meta">
+            <div class="inv-title">INVOICE</div>
+            <div class="inv-num">INV-${shortId}</div>
+            <div class="inv-pill ${p.paid_status === 'paid' ? '' : 'unpaid'}" style="${p.paid_status==='paid' ? 'background:#E3F3E9; color:#1D8A4E;' : ''}">${p.paid_status}</div>
+          </div>
+        </div>
+        <div class="inv-parties">
+          <div>
+            <div class="inv-label">Billed to</div>
+            <div class="inv-strong">${p.client_name || '—'}</div>
+          </div>
+          <div>
+            <div class="inv-label">Issued</div>
+            <div class="inv-strong">${new Date(p.created_at).toLocaleDateString()}</div>
+            <div class="inv-label" style="margin-top:10px;">Due</div>
+            <div class="inv-strong">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</div>
+          </div>
+        </div>
+        <table class="inv-table">
+          <tr><th>Description</th><th>Details</th><th style="text-align:right;">Amount</th></tr>
+          <tr><td>${p.service || 'Project work'}</td><td>${p.title}</td><td style="text-align:right;">${money(p.value)}</td></tr>
+        </table>
+        <div class="inv-totals">
+          <div class="inv-total-row grand"><span>Total due</span><span>${money(p.value)}</span></div>
+        </div>
+        <div class="inv-pay">
+          <div class="inv-label">Payment details</div>
+          <div class="inv-sub">Mobile money: +255 627 337 589 (Yusuph Hussein Kadondoro)</div>
+          <div class="inv-sub">Bank transfer: CRDB Bank, Account 010396180621 — Yusuph Hussein Kadondoro</div>
+        </div>`;
+    } catch(e){
+      doc.innerHTML = '<div class="empty-note">Something went wrong loading this invoice.</div>';
+    }
+
+    document.getElementById('public-invoice-print').addEventListener('click', ()=> window.print());
   })();
 </script>
 
