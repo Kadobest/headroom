@@ -923,8 +923,13 @@
             <option value="delivered">Delivered</option>
             <option value="feedback">Feedback</option>
             <option value="complete">Complete</option>
+            <option value="cancelled">Cancelled / Postponed</option>
           </select>
         </div>
+      </div>
+      <div class="login-field" id="proj-cancel-reason-wrap" style="display:none;">
+        <label>Reason for cancellation / postponement</label>
+        <input type="text" id="proj-cancel-reason" placeholder="e.g. Client postponed the event, budget fell through, etc.">
       </div>
       <div class="field-row">
         <div class="login-field"><label>Due date</label><input type="date" id="proj-due"></div>
@@ -1300,6 +1305,11 @@
       <div class="card" id="projects-table-card">
         <div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>
       </div>
+
+      <div class="section-title">Cancelled / postponed</div>
+      <div class="card" id="cancelled-projects-card">
+        <div class="empty-note">No cancelled or postponed projects.</div>
+      </div>
     </div>
 
     <!-- ================= CLIENTS ================= -->
@@ -1395,6 +1405,15 @@
           <h3>Own Label <span class="sub-cell">Label-tagged projects</span></h3>
           <div id="fin-label-work"><div class="empty-note">No label spend logged yet.</div></div>
         </div>
+      </div>
+
+      <div class="section-title">Cancelled / lost work</div>
+      <div class="card">
+        <div class="stat-card" style="border:none; padding:0; margin-bottom:12px;">
+          <div class="label">Value cancelled or postponed</div>
+          <div class="value sensitive" style="font-size:24px;" id="fin-cancelled-total">TSh 0</div>
+        </div>
+        <div id="fin-cancelled-work"><div class="empty-note">No cancelled projects.</div></div>
       </div>
     </div>
 
@@ -2070,7 +2089,7 @@
     const list = projects || [];
     projectsCache = list;
 
-    document.getElementById('nav-count-projects').textContent = list.length;
+    document.getElementById('nav-count-projects').textContent = list.filter(p => p.stage !== 'cancelled').length;
 
     ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
       const inStage = list.filter(p => p.stage === stage);
@@ -2090,13 +2109,14 @@
     });
 
     const tableCard = document.getElementById('projects-table-card');
-    if (!list.length){
+    const activeList = list.filter(p => p.stage !== 'cancelled');
+    if (!activeList.length){
       tableCard.innerHTML = '<div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>';
     } else {
       tableCard.innerHTML = `
         <table>
           <tr><th>Project</th><th>Client</th><th>Service</th><th>Type</th><th>Stage</th><th>Due</th><th>Value</th><th>Paid</th></tr>
-          ${list.map(p => `
+          ${activeList.map(p => `
             <tr class="rowhover" data-project-id="${p.id}">
               <td class="name-cell" style="cursor:pointer;">${p.title}</td>
               <td>${p.client_name || '—'}</td>
@@ -2109,6 +2129,7 @@
                   <option value="delivered" ${p.stage==='delivered'?'selected':''}>Delivered</option>
                   <option value="feedback" ${p.stage==='feedback'?'selected':''}>Feedback</option>
                   <option value="complete" ${p.stage==='complete'?'selected':''}>Complete</option>
+                  <option value="cancelled" ${p.stage==='cancelled'?'selected':''}>Cancelled</option>
                 </select>
               </td>
               <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
@@ -2132,37 +2153,68 @@
       });
     }
 
+    // Cancelled / postponed projects — kept on record with a reason, out of the active pipeline
+    const cancelledCard = document.getElementById('cancelled-projects-card');
+    const cancelledList = list.filter(p => p.stage === 'cancelled');
+    if (cancelledCard){
+      cancelledCard.innerHTML = cancelledList.length
+        ? `<table>
+            <tr><th>Project</th><th>Client</th><th>Value</th><th>Reason</th><th></th></tr>
+            ${cancelledList.map(p => `
+              <tr class="rowhover">
+                <td class="name-cell" style="cursor:pointer;" data-edit-id="${p.id}">${p.title}</td>
+                <td>${p.client_name || '—'}</td>
+                <td class="sensitive">${money(p.value)}</td>
+                <td class="sub-cell">${p.cancellation_reason || '—'}</td>
+                <td><button class="btn btn-ghost cancelled-delete-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px; color:#C3492E;">Delete</button></td>
+              </tr>`).join('')}
+          </table>`
+        : '<div class="empty-note">No cancelled or postponed projects.</div>';
+      cancelledCard.querySelectorAll('[data-edit-id]').forEach(el=>{
+        el.addEventListener('click', ()=> openProjectForEdit(el.dataset.editId));
+      });
+      cancelledCard.querySelectorAll('.cancelled-delete-btn').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          if (!confirm('Permanently delete this cancelled project? This cannot be undone.')) return;
+          await supabaseClient.from('projects').delete().eq('id', btn.dataset.id);
+          await loadProjects();
+        });
+      });
+    }
+
     renderInvoicesAndFinances(list);
     populateFeedbackProjectSelect(list);
     renderDashboard(list);
   }
 
   function renderDashboard(list){
+    const nonCancelled = list.filter(p => p.stage !== 'cancelled');
+
     // Stat cards
-    const activeCount = list.filter(p => p.stage !== 'complete').length;
+    const activeCount = nonCancelled.filter(p => p.stage !== 'complete').length;
     document.getElementById('dash-active-projects').textContent = activeCount;
 
-    const billable = list.filter(p => Number(p.value) > 0 && p.project_type === 'studio');
+    const billable = nonCancelled.filter(p => Number(p.value) > 0 && p.project_type === 'studio');
     const outstanding = billable.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
     document.getElementById('dash-outstanding').textContent = money(outstanding);
 
     const now = new Date();
-    const monthRevenue = list
+    const monthRevenue = nonCancelled
       .filter(p => p.paid_status === 'paid' && p.created_at && new Date(p.created_at).getMonth() === now.getMonth() && new Date(p.created_at).getFullYear() === now.getFullYear())
       .reduce((s,p)=>s+Number(p.value||0),0);
     document.getElementById('dash-revenue').textContent = money(monthRevenue);
 
     const in7Days = new Date(now); in7Days.setDate(now.getDate() + 7);
-    const upcoming = list
+    const upcoming = nonCancelled
       .filter(p => p.due_date && p.stage !== 'complete')
       .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
       .filter(p => p.dueObj >= now && p.dueObj <= in7Days)
       .sort((a,b) => a.dueObj - b.dueObj);
     document.getElementById('dash-deadlines').textContent = upcoming.length;
 
-    // Pipeline snapshot (mirrors the Projects view, condensed)
+    // Pipeline snapshot (mirrors the Projects view, condensed) — cancelled excluded, tracked separately
     ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
-      const inStage = list.filter(p => p.stage === stage);
+      const inStage = nonCancelled.filter(p => p.stage === stage);
       document.getElementById('dash-stage-count-' + stage).textContent = inStage.length;
       const container = document.getElementById('dash-stage-jobs-' + stage);
       container.innerHTML = inStage.length
@@ -2187,7 +2239,7 @@
     // Full calendar — every project with a due date, any time frame, soonest first
     const calCard = document.getElementById('calendar-card');
     if (calCard){
-      const allDated = list
+      const allDated = nonCancelled
         .filter(p => p.due_date)
         .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
         .sort((a,b) => a.dueObj - b.dueObj);
@@ -2202,7 +2254,10 @@
   }
 
   function renderInvoicesAndFinances(projects){
-    const billable = projects.filter(p => Number(p.value) > 0);
+    const nonCancelled = projects.filter(p => p.stage !== 'cancelled');
+    const cancelled = projects.filter(p => p.stage === 'cancelled');
+
+    const billable = nonCancelled.filter(p => Number(p.value) > 0);
     const invCard = document.getElementById('invoices-table-card');
     document.getElementById('nav-count-invoices').textContent = billable.filter(p => p.paid_status !== 'paid').length;
 
@@ -2242,8 +2297,8 @@
       });
     });
 
-    const clientWork = projects.filter(p => p.project_type === 'studio' && Number(p.value) > 0);
-    const labelWork = projects.filter(p => p.project_type === 'label');
+    const clientWork = nonCancelled.filter(p => p.project_type === 'studio' && Number(p.value) > 0);
+    const labelWork = nonCancelled.filter(p => p.project_type === 'label');
     const totalIncome = clientWork.filter(p => p.paid_status === 'paid').reduce((s,p)=>s+Number(p.value||0),0);
     const outstanding = clientWork.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
     const labelSpend = labelWork.reduce((s,p)=>s+Number(p.value||0),0);
@@ -2259,6 +2314,16 @@
     document.getElementById('fin-label-work').innerHTML = labelWork.length
       ? `<table>${labelWork.map(p=>`<tr><td class="sub-cell">${p.title}</td><td class="name-cell">${money(p.value)}</td><td><span class="pill ${p.paid_status}">${p.paid_status}</span></td></tr>`).join('')}</table>`
       : '<div class="empty-note">No label spend logged yet.</div>';
+
+    // Cancelled / lost work — kept for the record, not counted as active revenue or spend
+    const cancelledCard = document.getElementById('fin-cancelled-work');
+    if (cancelledCard){
+      const cancelledValue = cancelled.reduce((s,p)=>s+Number(p.value||0),0);
+      document.getElementById('fin-cancelled-total').textContent = money(cancelledValue);
+      cancelledCard.innerHTML = cancelled.length
+        ? `<table>${cancelled.map(p=>`<tr><td class="sub-cell">${p.title}</td><td class="name-cell">${money(p.value)}</td><td class="sub-cell">${p.cancellation_reason || '—'}</td></tr>`).join('')}</table>`
+        : '<div class="empty-note">No cancelled projects.</div>';
+    }
   }
 
   // ---- Clients ----
@@ -2545,11 +2610,18 @@
     await loadTracks();
   });
 
+  function toggleCancelReasonField(){
+    const stage = document.getElementById('proj-stage').value;
+    document.getElementById('proj-cancel-reason-wrap').style.display = stage === 'cancelled' ? '' : 'none';
+  }
+  document.getElementById('proj-stage').addEventListener('change', toggleCancelReasonField);
+
   function resetProjectModal(){
     editingProjectId = null;
     document.getElementById('project-modal-title').textContent = 'New Project';
     document.getElementById('project-delete').style.display = 'none';
     document.getElementById('project-form').reset();
+    toggleCancelReasonField();
   }
 
   function openProjectForEdit(id){
@@ -2569,6 +2641,8 @@
     document.getElementById('proj-value').value = p.value || 0;
     document.getElementById('proj-paid').value = p.paid_status || 'unpaid';
     document.getElementById('proj-notes').value = p.notes || '';
+    document.getElementById('proj-cancel-reason').value = p.cancellation_reason || '';
+    toggleCancelReasonField();
     document.getElementById('project-modal-scrim').classList.add('show');
   }
 
@@ -2723,6 +2797,9 @@
       value: Number(document.getElementById('proj-value').value || 0),
       paid_status: document.getElementById('proj-paid').value,
       notes: document.getElementById('proj-notes').value.trim(),
+      cancellation_reason: document.getElementById('proj-stage').value === 'cancelled'
+        ? document.getElementById('proj-cancel-reason').value.trim()
+        : null,
     };
     const { error } = editingProjectId
       ? await supabaseClient.from('projects').update(payload).eq('id', editingProjectId)

@@ -306,3 +306,15 @@ create policy "Owners can delete feedback" on public.feedback for delete using (
 --    even though they still live in one place for you to review.
 -- ============================================================
 alter table public.feedback add column if not exists stage_at_submission text;
+
+-- ============================================================
+-- 14. NEW (v10): Cancelled/postponed projects.
+--    Adds a "cancelled" stage plus a reason field, so cancelled
+--    work stays on record (with notes on why) instead of being
+--    deleted or awkwardly left in an active-looking stage.
+-- ============================================================
+alter table public.projects drop constraint if exists projects_stage_check;
+alter table public.projects add constraint projects_stage_check
+  check (stage in ('received','in_progress','delivered','feedback','complete','cancelled'));
+
+alter table public.projects add column if not exists cancellation_reason text;
