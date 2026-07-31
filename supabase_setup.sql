@@ -273,3 +273,36 @@ grant select on public.public_project_info to anon, authenticated;
 -- invoice/feedback page — never your notes field, never other
 -- clients' unrelated data beyond what this same mechanism exposes
 -- for their own linked project.
+
+-- ============================================================
+-- 12. NEW (v8): Let feedback be curated for the future website.
+--    Adds a "featured" flag you control from the app — only
+--    feedback you've explicitly marked gets exposed publicly.
+-- ============================================================
+alter table public.feedback add column if not exists featured boolean default false;
+
+-- A safe, narrow view for the future website to pull testimonials from —
+-- only feedback you've marked as featured, and only the fields a
+-- public testimonial needs (never internal project financials).
+create or replace view public.public_testimonials as
+select f.id, f.client_name, f.rating, f.comment, f.created_at, p.title as project_title
+from public.feedback f
+left join public.projects p on p.id = f.project_id
+where f.featured = true;
+
+grant select on public.public_testimonials to anon, authenticated;
+
+-- Owners can update the "featured" flag and delete feedback entirely
+-- (e.g. anything inappropriate) — assistants/viewers still can't.
+drop policy if exists "Owners can update feedback" on public.feedback;
+create policy "Owners can update feedback" on public.feedback for update using (public.is_owner());
+drop policy if exists "Owners can delete feedback" on public.feedback;
+create policy "Owners can delete feedback" on public.feedback for delete using (public.is_owner());
+
+-- ============================================================
+-- 13. NEW (v9): Tag each feedback entry with the project stage
+--    it was submitted at, so draft-review notes and final,
+--    close-out feedback are clearly labeled apart in the list —
+--    even though they still live in one place for you to review.
+-- ============================================================
+alter table public.feedback add column if not exists stage_at_submission text;

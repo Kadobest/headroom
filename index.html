@@ -767,13 +767,13 @@
       <div class="cvf-question">Your name</div>
       <input type="text" id="public-feedback-name" class="cvf-textarea" style="min-height:auto;" placeholder="So we know who to thank">
 
-      <div class="cvf-question" style="margin-top:14px;">How was the final result?</div>
+      <div class="cvf-question" id="public-feedback-q1" style="margin-top:14px;">How was the final result?</div>
       <div class="cvf-stars" id="public-feedback-stars">
         <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
       </div>
 
-      <div class="cvf-question">Anything you'd like changed or noted?</div>
-      <textarea class="cvf-textarea" id="public-feedback-comment" placeholder="Tell us what worked and what didn't — the more specific, the better."></textarea>
+      <div class="cvf-question" id="public-feedback-q2">Any comments you'd like to share?</div>
+      <textarea class="cvf-textarea" id="public-feedback-comment" placeholder="We'd love to hear your thoughts."></textarea>
 
       <button class="cvf-submit" id="public-feedback-submit">Submit feedback</button>
       <div class="cvf-note" id="public-feedback-note">Takes under a minute · Goes straight to Kado</div>
@@ -1425,8 +1425,8 @@
           <div class="cvf-question">How was the final result?</div>
           <div class="cvf-stars"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
 
-          <div class="cvf-question">Anything you'd like changed or noted?</div>
-          <textarea class="cvf-textarea" placeholder="Tell us what worked and what didn't — the more specific, the better."></textarea>
+          <div class="cvf-question">Any comments you'd like to share?</div>
+          <textarea class="cvf-textarea" placeholder="We'd love to hear your thoughts."></textarea>
 
           <button class="cvf-submit">Submit feedback</button>
           <div class="cvf-note">Takes under a minute · Goes straight to Kado</div>
@@ -1526,7 +1526,10 @@
     document.getElementById('topbar-sub').textContent = titles.dashboard[1];
   }
 
+  let currentUserRole = 'assistant';
+
   function applyRole(role, email, fullName, title){
+    currentUserRole = role;
     const isOwner = role === 'owner';
     const isViewer = role === 'viewer';
     const isRestricted = !isOwner; // assistant or viewer both lose owner-only sections
@@ -2349,14 +2352,44 @@
       .order('created_at', { ascending: false });
     const list = data || [];
     const card = document.getElementById('feedback-received-card');
+    const isOwner = currentUserRole === 'owner';
     card.innerHTML = list.length
-      ? list.map(f => `
-          <div style="margin-bottom:16px;">
-            <div class="stars">${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}</div>
+      ? list.map(f => {
+          const isDraftStage = f.stage_at_submission && f.stage_at_submission !== 'complete' && f.stage_at_submission !== 'delivered';
+          const badge = f.stage_at_submission
+            ? `<span class="tag-flag ${isDraftStage ? 'label' : 'studio'}" style="margin-left:8px;">${isDraftStage ? 'Draft review' : 'Final feedback'}</span>`
+            : '';
+          return `
+          <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #EEF0F4;">
+            <div class="stars">${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}${badge}</div>
             <div class="quote">"${f.comment || 'No written comment.'}"</div>
             <div class="sub-cell" style="margin-top:4px;">${f.client_name || 'Anonymous'} · ${f.projects ? f.projects.title : 'Project removed'} · ${new Date(f.created_at).toLocaleDateString()}</div>
-          </div>`).join('')
+            ${isOwner ? `
+              <div style="margin-top:8px; display:flex; align-items:center; gap:14px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#6B7690; cursor:pointer;">
+                  <input type="checkbox" class="feedback-feature-toggle" data-id="${f.id}" ${f.featured ? 'checked' : ''}>
+                  Feature on website
+                </label>
+                <button class="feedback-delete-btn" data-id="${f.id}" style="border:none; background:none; color:#C3492E; font-size:11.5px; cursor:pointer; padding:0;">Delete</button>
+              </div>` : ''}
+          </div>`;
+        }).join('')
       : '<div class="empty-note">No feedback received yet — once clients start submitting, real entries will show up here.</div>';
+
+    if (isOwner){
+      card.querySelectorAll('.feedback-feature-toggle').forEach(cb=>{
+        cb.addEventListener('change', async ()=>{
+          await supabaseClient.from('feedback').update({ featured: cb.checked }).eq('id', cb.dataset.id);
+        });
+      });
+      card.querySelectorAll('.feedback-delete-btn').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          if (!confirm('Delete this feedback? This cannot be undone.')) return;
+          await supabaseClient.from('feedback').delete().eq('id', btn.dataset.id);
+          await loadFeedbackList();
+        });
+      });
+    }
 
     // Dashboard "Latest feedback" — most recent 3
     const dashCard = document.getElementById('dash-latest-feedback');
@@ -2819,14 +2852,23 @@
       });
     });
 
-    // Look up the project name for a bit of context (public, read-only-safe
-    // since anon can only ever select nothing from projects directly —
-    // this uses the same public client, so if it fails we just skip it)
+    let projectStageAtLoad = null;
+
+    // Look up the project (name + stage) for context — and to adapt the
+    // wording depending on whether this is a draft under review (still
+    // open to revisions) or a completed, approved project (closing note only).
     (async ()=>{
       try {
         const anonClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const { data } = await anonClient.from('public_project_info').select('title, client_name').eq('id', projectId).single();
-        if (data) document.getElementById('public-feedback-project').textContent = `From Brighten Sounds Studio — "${data.title}"`;
+        const { data } = await anonClient.from('public_project_info').select('title, client_name, stage').eq('id', projectId).single();
+        if (data){
+          projectStageAtLoad = data.stage;
+          document.getElementById('public-feedback-project').textContent = `From Brighten Sounds Studio — "${data.title}"`;
+          const isComplete = data.stage === 'complete' || data.stage === 'delivered';
+          document.getElementById('public-feedback-q1').textContent = isComplete ? 'How was the final result?' : 'How does this draft feel so far?';
+          document.getElementById('public-feedback-q2').textContent = isComplete ? 'Any comments you\'d like to share?' : 'Any notes or changes you\'d like on this draft?';
+          document.getElementById('public-feedback-comment').placeholder = isComplete ? "We'd love to hear your thoughts." : "Tell us what you'd like adjusted — as specific as you like.";
+        }
       } catch(e){ /* fine, keep generic text */ }
     })();
 
@@ -2843,6 +2885,7 @@
         client_name: document.getElementById('public-feedback-name').value.trim() || null,
         rating,
         comment: document.getElementById('public-feedback-comment').value.trim() || null,
+        stage_at_submission: projectStageAtLoad,
       });
       if (error){
         btn.disabled = false; btn.textContent = 'Submit feedback';
