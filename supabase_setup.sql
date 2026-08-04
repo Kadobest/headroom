@@ -318,3 +318,37 @@ alter table public.projects add constraint projects_stage_check
   check (stage in ('received','in_progress','delivered','feedback','complete','cancelled'));
 
 alter table public.projects add column if not exists cancellation_reason text;
+
+-- ============================================================
+-- 15. NEW (v11): 
+--   - contact_person on clients — for when the client is a
+--     company/label, so you can note who you actually deal with there.
+--   - artist_name on projects — for batches where multiple songs
+--     under one client (e.g. a producer) belong to different artists.
+-- ============================================================
+alter table public.clients add column if not exists contact_person text;
+alter table public.projects add column if not exists artist_name text;
+
+-- ============================================================
+-- 16. NEW (v12): Scheduled sessions per project.
+--    For work that spans multiple visits/sessions rather than
+--    one clean deadline (e.g. a choir recording continued over
+--    two sessions) — log each planned date with a note, instead
+--    of forcing everything into a single due date.
+-- ============================================================
+create table if not exists public.project_sessions (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  session_date date,
+  note text,
+  created_at timestamp with time zone default now()
+);
+alter table public.project_sessions enable row level security;
+drop policy if exists "Team can view sessions" on public.project_sessions;
+create policy "Team can view sessions" on public.project_sessions for select using (public.is_team_member());
+drop policy if exists "Editors can insert sessions" on public.project_sessions;
+create policy "Editors can insert sessions" on public.project_sessions for insert with check (public.can_edit());
+drop policy if exists "Editors can update sessions" on public.project_sessions;
+create policy "Editors can update sessions" on public.project_sessions for update using (public.can_edit());
+drop policy if exists "Editors can delete sessions" on public.project_sessions;
+create policy "Editors can delete sessions" on public.project_sessions for delete using (public.can_edit());

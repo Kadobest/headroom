@@ -897,8 +897,20 @@
 <div class="data-modal-scrim" id="project-modal-scrim">
   <div class="data-modal">
     <h3 id="project-modal-title">New Project</h3>
+    <label id="proj-batch-toggle-wrap" style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#6B7690; margin-bottom:14px; cursor:pointer;">
+      <input type="checkbox" id="proj-batch-toggle"> Add multiple at once (e.g. a batch of songs from one client)
+    </label>
     <form id="project-form">
-      <div class="login-field"><label>Project title</label><input type="text" id="proj-title" required placeholder="e.g. Wedding Highlight Mix"></div>
+      <div class="login-field" id="proj-title-single-wrap">
+        <label>Project title</label>
+        <input type="text" id="proj-title" required placeholder="e.g. Wedding Highlight Mix">
+      </div>
+      <div class="login-field" id="proj-title-batch-wrap" style="display:none;">
+        <label>Songs / items in this batch</label>
+        <div id="proj-batch-rows"></div>
+        <button type="button" class="btn btn-ghost" id="proj-batch-add-row" style="margin-top:6px; padding:6px 12px; font-size:12px;">+ Add another song</button>
+        <div class="login-note" style="text-align:left; margin-top:6px;">Client and company stay the same for the whole batch — everything else (artist, service, deadline, price, status) is set per song.</div>
+      </div>
       <div class="login-field"><label>Client name</label><input type="text" id="proj-client" required placeholder="e.g. Amani Events"></div>
       <div class="field-row">
         <div class="login-field"><label>Client's company / label (optional)</label><input type="text" id="proj-client-company" placeholder="e.g. Brighten Sounds"></div>
@@ -911,7 +923,10 @@
           </select>
         </div>
       </div>
-      <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, Live Event, Voice-over"></div>
+      <div id="proj-single-only-fields">
+        <div class="login-field"><label>Artist (optional)</label><input type="text" id="proj-artist" placeholder="e.g. the specific artist this song is for"></div>
+        <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, Live Event, Voice-over"></div>
+      </div>
       <div class="field-row">
         <div class="login-field"><label>Type</label>
           <select id="proj-type"><option value="studio">Studio</option><option value="label">Label</option></select>
@@ -931,17 +946,26 @@
         <label>Reason for cancellation / postponement</label>
         <input type="text" id="proj-cancel-reason" placeholder="e.g. Client postponed the event, budget fell through, etc.">
       </div>
-      <div class="field-row">
-        <div class="login-field"><label>Due date</label><input type="date" id="proj-due"></div>
-        <div class="login-field"><label>Value (TSh)</label><input type="number" id="proj-value" placeholder="0"></div>
+      <div id="proj-single-only-fields-2">
+        <div class="field-row">
+          <div class="login-field"><label>Due date (optional)</label><input type="date" id="proj-due"></div>
+          <div class="login-field"><label id="proj-value-label">Value (TSh)</label><input type="number" id="proj-value" placeholder="0"></div>
+        </div>
+        <div class="login-note" style="text-align:left; margin-top:-6px; margin-bottom:14px;">Leave the due date blank if this doesn't have one clean deadline — for work spanning multiple visits (like a session continued over two days), use "Scheduled sessions" below instead.</div>
+        <div class="login-field">
+          <label>Paid status</label>
+          <select id="proj-paid">
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
+            <option value="partial">Partial</option>
+            <option value="free">Free</option>
+          </select>
+        </div>
       </div>
-      <div class="login-field"><label>Paid status</label>
-        <select id="proj-paid">
-          <option value="unpaid">Unpaid</option>
-          <option value="paid">Paid</option>
-          <option value="partial">Partial</option>
-          <option value="free">Free</option>
-        </select>
+      <div class="login-field" id="proj-sessions-wrap" style="display:none;">
+        <label>Scheduled sessions</label>
+        <div id="proj-sessions-list"></div>
+        <button type="button" class="btn btn-ghost" id="proj-session-add-row" style="margin-top:6px; padding:6px 12px; font-size:12px;">+ Add a session</button>
       </div>
       <div class="login-field"><label>Notes (optional)</label><input type="text" id="proj-notes" placeholder="Anything worth remembering"></div>
       <div class="btn-row">
@@ -959,6 +983,7 @@
     <h3 id="client-modal-title">Add Client</h3>
     <form id="client-form">
       <div class="login-field"><label>Name</label><input type="text" id="client-name" required placeholder="A person's name, or a company/label name if the client IS the company"></div>
+      <div class="login-field"><label>Contact person (if this client is a company, who do you deal with there?)</label><input type="text" id="client-contact-person" placeholder="e.g. Neema (bookings manager)"></div>
       <div class="login-field"><label>Type</label><input type="text" id="client-type" placeholder="e.g. Label artist, Corporate, Events"></div>
       <div class="field-row">
         <div class="login-field"><label>Works for (company/label, optional)</label><input type="text" id="client-company-name" placeholder="Leave blank if the name above IS the company"></div>
@@ -2099,7 +2124,7 @@
         ? inStage.map(p => `
             <div class="job" data-project-id="${p.id}" style="cursor:pointer;">
               <div class="jtitle">${p.title}</div>
-              <div class="jclient">${p.client_name || ''}</div>
+              <div class="jclient">${p.client_name || ''}${p.artist_name ? ' · ' + p.artist_name : ''}</div>
               <div class="jmeta"><span class="tag-svc mix">${p.service || 'Project'}</span><span class="due">${p.due_date ? new Date(p.due_date).toLocaleDateString() : ''}</span></div>
             </div>`).join('')
         : '<div class="empty-note">No projects yet</div>';
@@ -2119,7 +2144,7 @@
           ${activeList.map(p => `
             <tr class="rowhover" data-project-id="${p.id}">
               <td class="name-cell" style="cursor:pointer;">${p.title}</td>
-              <td>${p.client_name || '—'}</td>
+              <td>${p.client_name || '—'}${p.artist_name ? '<div class="sub-cell">' + p.artist_name + '</div>' : ''}</td>
               <td>${p.service || '—'}</td>
               <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : 'Studio'}</span></td>
               <td>
@@ -2221,7 +2246,7 @@
         ? inStage.slice(0, 4).map(p => `
             <div class="job">
               <div class="jtitle">${p.title}</div>
-              <div class="jclient">${p.client_name || ''}</div>
+              <div class="jclient">${p.client_name || ''}${p.artist_name ? ' · ' + p.artist_name : ''}</div>
             </div>`).join('') + (inStage.length > 4 ? `<div class="sub-cell" style="text-align:center; padding:4px;">+${inStage.length - 4} more</div>` : '')
         : '<div class="empty-note">No projects yet</div>';
     });
@@ -2236,21 +2261,42 @@
           </div>`).join('')
       : '<div class="empty-note">Nothing scheduled yet</div>';
 
-    // Full calendar — every project with a due date, any time frame, soonest first
+    renderCalendar(nonCancelled);
+  }
+
+  // Full calendar — every project due date PLUS every scheduled session,
+  // merged together and sorted soonest first (so multi-session work like
+  // a choir recording continued over two days shows both dates clearly).
+  async function renderCalendar(nonCancelledProjects){
     const calCard = document.getElementById('calendar-card');
-    if (calCard){
-      const allDated = nonCancelled
-        .filter(p => p.due_date)
-        .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
-        .sort((a,b) => a.dueObj - b.dueObj);
-      calCard.innerHTML = allDated.length
-        ? allDated.map(p => `
-            <div class="cal-row">
-              <div class="cal-date"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
-              <div class="cal-info"><div class="t">${p.title}</div><div class="s">${p.client_name || ''} · ${stageLabel[p.stage]}</div></div>
-            </div>`).join('')
-        : '<div class="empty-note">Nothing scheduled yet.</div>';
-    }
+    if (!calCard) return;
+
+    const dueEntries = nonCancelledProjects
+      .filter(p => p.due_date)
+      .map(p => ({ dateObj: new Date(p.due_date), title: p.title, sub: `${p.client_name || ''} · ${stageLabel[p.stage]} · Due date` }));
+
+    const { data: sessions } = await supabaseClient
+      .from('project_sessions')
+      .select('*, projects(title, client_name, stage)')
+      .not('session_date', 'is', null);
+
+    const sessionEntries = (sessions || [])
+      .filter(s => s.projects) // skip orphaned sessions from deleted projects
+      .map(s => ({
+        dateObj: new Date(s.session_date),
+        title: s.projects.title,
+        sub: `${s.projects.client_name || ''} · Session${s.note ? ' — ' + s.note : ''}`,
+      }));
+
+    const all = [...dueEntries, ...sessionEntries].sort((a,b) => a.dateObj - b.dateObj);
+
+    calCard.innerHTML = all.length
+      ? all.map(entry => `
+          <div class="cal-row">
+            <div class="cal-date"><div class="d">${entry.dateObj.getDate()}</div><div class="m">${entry.dateObj.toLocaleString('default',{month:'short'})}</div></div>
+            <div class="cal-info"><div class="t">${entry.title}</div><div class="s">${entry.sub}</div></div>
+          </div>`).join('')
+      : '<div class="empty-note">Nothing scheduled yet.</div>';
   }
 
   function renderInvoicesAndFinances(projects){
@@ -2337,8 +2383,8 @@
     const card = document.getElementById('clients-table-card');
     card.innerHTML = list.length
       ? `<table>
-          <tr><th>Name</th><th>Type</th><th>Company / Label</th><th>Phone</th><th>Email</th><th>Notes</th></tr>
-          ${list.map(c => `<tr class="rowhover" data-client-id="${c.id}" style="cursor:pointer;"><td class="name-cell">${c.name}</td><td>${c.type||'—'}</td><td>${c.company_name ? c.company_name + (c.company_type ? ' <span class="sub-cell">('+c.company_type+')</span>' : '') : '—'}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td><td class="sub-cell">${c.notes||'—'}</td></tr>`).join('')}
+          <tr><th>Name</th><th>Contact person</th><th>Type</th><th>Company / Label</th><th>Phone</th><th>Email</th><th>Notes</th></tr>
+          ${list.map(c => `<tr class="rowhover" data-client-id="${c.id}" style="cursor:pointer;"><td class="name-cell">${c.name}</td><td class="sub-cell">${c.contact_person||'—'}</td><td>${c.type||'—'}</td><td>${c.company_name ? c.company_name + (c.company_type ? ' <span class="sub-cell">('+c.company_type+')</span>' : '') : '—'}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td><td class="sub-cell">${c.notes||'—'}</td></tr>`).join('')}
         </table>`
       : '<div class="empty-note">No clients yet — click "+ Add Client" to add one, including clients you worked with before Headroom.</div>';
     card.querySelectorAll('tr[data-client-id]').forEach(el=>{
@@ -2616,11 +2662,106 @@
   }
   document.getElementById('proj-stage').addEventListener('change', toggleCancelReasonField);
 
+  // ---------- Batch mode: one row per song/item, each with its own fields ----------
+  let batchRowCount = 0;
+  function addBatchRow(prefill){
+    const id = batchRowCount++;
+    const wrap = document.createElement('div');
+    wrap.className = 'batch-row';
+    wrap.dataset.rowId = id;
+    wrap.style.cssText = 'border:1px solid #E3E6EC; border-radius:8px; padding:10px; margin-bottom:8px;';
+    wrap.innerHTML = `
+      <div class="field-row" style="margin-bottom:0;">
+        <div class="login-field"><input type="text" class="batch-title" placeholder="Song title" value="${prefill?.title || ''}" required></div>
+        <div class="login-field"><input type="text" class="batch-artist" placeholder="Artist (optional)" value="${prefill?.artist || ''}"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:0;">
+        <div class="login-field"><input type="text" class="batch-service" placeholder="Service (e.g. Mixing, Mixing + beat work)" value="${prefill?.service || ''}"></div>
+        <div class="login-field"><input type="date" class="batch-due" value="${prefill?.due || ''}"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:0;">
+        <div class="login-field"><input type="number" class="batch-value" placeholder="Value (TSh)" value="${prefill?.value || ''}"></div>
+        <div class="login-field">
+          <select class="batch-paid">
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
+            <option value="partial">Partial</option>
+            <option value="free">Free</option>
+          </select>
+        </div>
+      </div>
+      <button type="button" class="batch-row-remove" style="border:none; background:none; color:#C3492E; font-size:11.5px; cursor:pointer; padding:0; margin-top:4px;">Remove this song</button>
+    `;
+    document.getElementById('proj-batch-rows').appendChild(wrap);
+    wrap.querySelector('.batch-row-remove').addEventListener('click', ()=> wrap.remove());
+  }
+  document.getElementById('proj-batch-add-row').addEventListener('click', ()=> addBatchRow());
+
+  function setBatchMode(isBatch){
+    document.getElementById('proj-title-single-wrap').style.display = isBatch ? 'none' : '';
+    document.getElementById('proj-title-batch-wrap').style.display = isBatch ? '' : 'none';
+    document.getElementById('proj-single-only-fields').style.display = isBatch ? 'none' : '';
+    document.getElementById('proj-single-only-fields-2').style.display = isBatch ? 'none' : '';
+    document.getElementById('proj-title').required = !isBatch;
+    if (isBatch && !document.getElementById('proj-batch-rows').children.length){
+      addBatchRow(); addBatchRow(); addBatchRow();
+    }
+  }
+  document.getElementById('proj-batch-toggle').addEventListener('change', (e)=> setBatchMode(e.target.checked));
+
+  // ---------- Scheduled sessions (for projects without one clean deadline) ----------
+  let sessionRowCount = 0;
+  function addSessionRow(prefill){
+    const rowId = sessionRowCount++;
+    const wrap = document.createElement('div');
+    wrap.className = 'session-row';
+    wrap.dataset.rowId = rowId;
+    wrap.dataset.sessionId = prefill?.id || '';
+    wrap.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px;';
+    wrap.innerHTML = `
+      <input type="date" class="session-date" value="${prefill?.session_date || ''}" style="width:150px; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px; font-size:13.5px;">
+      <input type="text" class="session-note" placeholder="What happened / what's planned" value="${prefill?.note || ''}" style="flex:1; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px; font-size:13.5px;">
+      <button type="button" class="session-remove" style="border:none; background:none; color:#C3492E; font-size:12px; cursor:pointer; padding:8px 4px;">✕</button>
+    `;
+    document.getElementById('proj-sessions-list').appendChild(wrap);
+    wrap.querySelector('.session-remove').addEventListener('click', ()=> wrap.remove());
+  }
+  document.getElementById('proj-session-add-row').addEventListener('click', ()=> addSessionRow());
+
+  async function loadSessionsIntoForm(projectId){
+    document.getElementById('proj-sessions-list').innerHTML = '';
+    const { data } = await supabaseClient.from('project_sessions').select('*').eq('project_id', projectId).order('session_date', { ascending: true });
+    (data || []).forEach(s => addSessionRow(s));
+  }
+
+  async function saveSessionsForProject(projectId){
+    const rows = document.querySelectorAll('#proj-sessions-list .session-row');
+    for (const row of rows){
+      const sessionId = row.dataset.sessionId;
+      const payload = {
+        project_id: projectId,
+        session_date: row.querySelector('.session-date').value || null,
+        note: row.querySelector('.session-note').value.trim(),
+      };
+      if (sessionId){
+        await supabaseClient.from('project_sessions').update(payload).eq('id', sessionId);
+      } else if (payload.session_date || payload.note){
+        await supabaseClient.from('project_sessions').insert(payload);
+      }
+    }
+  }
+
   function resetProjectModal(){
     editingProjectId = null;
     document.getElementById('project-modal-title').textContent = 'New Project';
     document.getElementById('project-delete').style.display = 'none';
     document.getElementById('project-form').reset();
+    document.getElementById('proj-batch-toggle').checked = false;
+    document.getElementById('proj-batch-toggle-wrap').style.display = '';
+    document.getElementById('proj-batch-rows').innerHTML = '';
+    document.getElementById('proj-sessions-wrap').style.display = 'none';
+    document.getElementById('proj-sessions-list').innerHTML = '';
+    setBatchMode(false);
     toggleCancelReasonField();
   }
 
@@ -2630,10 +2771,13 @@
     editingProjectId = id;
     document.getElementById('project-modal-title').textContent = 'Edit Project';
     document.getElementById('project-delete').style.display = '';
+    document.getElementById('proj-batch-toggle-wrap').style.display = 'none'; // editing is always one at a time
+    setBatchMode(false);
     document.getElementById('proj-title').value = p.title || '';
     document.getElementById('proj-client').value = p.client_name || '';
     document.getElementById('proj-client-company').value = '';
     document.getElementById('proj-client-company-type').value = '';
+    document.getElementById('proj-artist').value = p.artist_name || '';
     document.getElementById('proj-service').value = p.service || '';
     document.getElementById('proj-type').value = p.project_type || 'studio';
     document.getElementById('proj-stage').value = p.stage || 'received';
@@ -2643,6 +2787,8 @@
     document.getElementById('proj-notes').value = p.notes || '';
     document.getElementById('proj-cancel-reason').value = p.cancellation_reason || '';
     toggleCancelReasonField();
+    document.getElementById('proj-sessions-wrap').style.display = '';
+    loadSessionsIntoForm(id);
     document.getElementById('project-modal-scrim').classList.add('show');
   }
 
@@ -2659,6 +2805,7 @@
     document.getElementById('client-modal-title').textContent = 'Edit Client';
     document.getElementById('client-delete').style.display = '';
     document.getElementById('client-name').value = c.name || '';
+    document.getElementById('client-contact-person').value = c.contact_person || '';
     document.getElementById('client-type').value = c.type || '';
     document.getElementById('client-company-name').value = c.company_name || '';
     document.getElementById('client-company-type').value = c.company_type || '';
@@ -2787,23 +2934,55 @@
     const clientName = document.getElementById('proj-client').value.trim();
     const clientCompany = document.getElementById('proj-client-company').value.trim();
     const clientCompanyType = document.getElementById('proj-client-company-type').value;
-    const payload = {
-      title: document.getElementById('proj-title').value.trim(),
+    const isBatch = document.getElementById('proj-batch-toggle').checked && !editingProjectId;
+
+    // Fields shared across the whole batch (same client, same overall type/stage)
+    const sharedFields = {
       client_name: clientName,
-      service: document.getElementById('proj-service').value.trim(),
       project_type: document.getElementById('proj-type').value,
       stage: document.getElementById('proj-stage').value,
-      due_date: document.getElementById('proj-due').value || null,
-      value: Number(document.getElementById('proj-value').value || 0),
-      paid_status: document.getElementById('proj-paid').value,
       notes: document.getElementById('proj-notes').value.trim(),
       cancellation_reason: document.getElementById('proj-stage').value === 'cancelled'
         ? document.getElementById('proj-cancel-reason').value.trim()
         : null,
     };
-    const { error } = editingProjectId
-      ? await supabaseClient.from('projects').update(payload).eq('id', editingProjectId)
-      : await supabaseClient.from('projects').insert(payload);
+
+    let error;
+    if (isBatch){
+      const rowEls = document.querySelectorAll('#proj-batch-rows .batch-row');
+      const rows = Array.from(rowEls).map(row => ({
+        title: row.querySelector('.batch-title').value.trim(),
+        artist_name: row.querySelector('.batch-artist').value.trim(),
+        service: row.querySelector('.batch-service').value.trim(),
+        due_date: row.querySelector('.batch-due').value || null,
+        value: Number(row.querySelector('.batch-value').value || 0),
+        paid_status: row.querySelector('.batch-paid').value,
+        ...sharedFields,
+      })).filter(r => r.title);
+      if (!rows.length){
+        btn.disabled = false; btn.textContent = 'Save project';
+        alert('Add at least one song with a title.');
+        return;
+      }
+      ({ error } = await supabaseClient.from('projects').insert(rows));
+    } else {
+      const payload = {
+        title: document.getElementById('proj-title').value.trim(),
+        artist_name: document.getElementById('proj-artist').value.trim(),
+        service: document.getElementById('proj-service').value.trim(),
+        due_date: document.getElementById('proj-due').value || null,
+        value: Number(document.getElementById('proj-value').value || 0),
+        paid_status: document.getElementById('proj-paid').value,
+        ...sharedFields,
+      };
+      ({ error } = editingProjectId
+        ? await supabaseClient.from('projects').update(payload).eq('id', editingProjectId)
+        : await supabaseClient.from('projects').insert(payload));
+      if (!error && editingProjectId){
+        await saveSessionsForProject(editingProjectId);
+      }
+    }
+
     if (!error){
       await ensureClientExists(clientName, clientCompany, clientCompanyType);
     }
@@ -2821,6 +3000,7 @@
     btn.disabled = true; btn.textContent = 'Saving…';
     const payload = {
       name: document.getElementById('client-name').value.trim(),
+      contact_person: document.getElementById('client-contact-person').value.trim(),
       type: document.getElementById('client-type').value.trim(),
       company_name: document.getElementById('client-company-name').value.trim(),
       company_type: document.getElementById('client-company-type').value || null,
