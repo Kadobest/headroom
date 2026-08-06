@@ -361,6 +361,12 @@
   .tag-flag.studio{ background:#E4E9F5; color:var(--navy); }
   .tag-flag.label{ background:#FDE9D9; color:var(--orange-dim); }
   .tag-flag.events{ background:#DFF3F1; color:#137A6F; }
+  .due-flag{
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+    padding:2px 6px; border-radius:4px; white-space:nowrap; display:inline-block;
+  }
+  .due-flag.overdue{ background:#FDE7E3; color:#C3492E; }
+  .due-flag.soon{ background:#FFF3D6; color:#9A7514; }
 
   .pill.free{ background:#EDEFF3; color:#5A6478; }
   .tag-svc.field{ background:#DCEEF2; color:#1C6E7D; }
@@ -2282,6 +2288,19 @@
   // =========================================================
 
   const money = (n) => 'TSh ' + Number(n || 0).toLocaleString();
+
+  // Flags a due date as overdue (red), due soon (within 3 days, orange), or normal.
+  // Pass the project/invoice's stage too — completed or cancelled work is never flagged.
+  function dueBadge(dateStr, stage){
+    if (!dateStr) return '';
+    if (stage === 'complete' || stage === 'cancelled') return '';
+    const due = new Date(dateStr);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diffDays = Math.round((due - today) / 86400000);
+    if (diffDays < 0) return ` <span class="due-flag overdue">Overdue</span>`;
+    if (diffDays <= 3) return ` <span class="due-flag soon">Due soon</span>`;
+    return '';
+  }
   const stageLabel = { received:'Received', in_progress:'In Progress', delivered:'Delivered', feedback:'Feedback', complete:'Complete' };
   let projectsCache = [];
   let editingProjectId = null;
@@ -2339,7 +2358,7 @@
                   <option value="cancelled" ${p.stage==='cancelled'?'selected':''}>Cancelled</option>
                 </select>
               </td>
-              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
+              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${dueBadge(p.due_date, p.stage)}</td>
               <td class="sensitive" style="cursor:pointer;">${money(p.value)}</td>
               <td class="sensitive" style="cursor:pointer;"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
             </tr>`).join('')}
@@ -2415,9 +2434,12 @@
     const upcoming = nonCancelled
       .filter(p => p.due_date && p.stage !== 'complete')
       .map(p => ({ ...p, dueObj: new Date(p.due_date) }))
-      .filter(p => p.dueObj >= now && p.dueObj <= in7Days)
+      .filter(p => p.dueObj <= in7Days) // includes anything overdue, not just future
       .sort((a,b) => a.dueObj - b.dueObj);
-    document.getElementById('dash-deadlines').textContent = upcoming.length;
+    const overdueCount = upcoming.filter(p => p.dueObj < now).length;
+    document.getElementById('dash-deadlines').innerHTML = overdueCount > 0
+      ? `${upcoming.length} <span class="due-flag overdue" style="margin-left:4px;">${overdueCount} overdue</span>`
+      : upcoming.length;
 
     // Pipeline snapshot (mirrors the Projects view, condensed) — cancelled excluded, tracked separately
     ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
@@ -2433,13 +2455,13 @@
         : '<div class="empty-note">No projects yet</div>';
     });
 
-    // Upcoming deadlines (all due dates in the next 7 days, any stage)
+    // Upcoming deadlines — overdue items first, then anything due in the next 7 days
     const upcomingCard = document.getElementById('dash-upcoming');
     upcomingCard.innerHTML = upcoming.length
       ? upcoming.map(p => `
           <div class="cal-row">
-            <div class="cal-date"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
-            <div class="cal-info"><div class="t">${p.title}</div><div class="s">${p.client_name || ''}</div></div>
+            <div class="cal-date" style="${p.dueObj < now ? 'background:#C3492E;' : ''}"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
+            <div class="cal-info"><div class="t">${p.title}${dueBadge(p.due_date, p.stage)}</div><div class="s">${p.client_name || ''}</div></div>
           </div>`).join('')
       : '<div class="empty-note">Nothing scheduled yet</div>';
 
@@ -2455,7 +2477,7 @@
 
     const dueEntries = nonCancelledProjects
       .filter(p => p.due_date)
-      .map(p => ({ dateObj: new Date(p.due_date), title: p.title, sub: `${p.client_name || ''} · ${stageLabel[p.stage]} · Due date` }));
+      .map(p => ({ dateObj: new Date(p.due_date), title: p.title, sub: `${p.client_name || ''} · ${stageLabel[p.stage]} · Due date`, stage: p.stage, dueRaw: p.due_date }));
 
     const { data: sessions } = await supabaseClient
       .from('project_sessions')
@@ -2468,15 +2490,17 @@
         dateObj: new Date(s.session_date),
         title: s.projects.title,
         sub: `${s.projects.client_name || ''} · Session${s.note ? ' — ' + s.note : ''}`,
+        stage: null, dueRaw: null, // sessions aren't flagged overdue, just due dates are
       }));
 
     const all = [...dueEntries, ...sessionEntries].sort((a,b) => a.dateObj - b.dateObj);
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
     calCard.innerHTML = all.length
       ? all.map(entry => `
           <div class="cal-row">
-            <div class="cal-date"><div class="d">${entry.dateObj.getDate()}</div><div class="m">${entry.dateObj.toLocaleString('default',{month:'short'})}</div></div>
-            <div class="cal-info"><div class="t">${entry.title}</div><div class="s">${entry.sub}</div></div>
+            <div class="cal-date" style="${entry.dueRaw && entry.dateObj < todayStart ? 'background:#C3492E;' : ''}"><div class="d">${entry.dateObj.getDate()}</div><div class="m">${entry.dateObj.toLocaleString('default',{month:'short'})}</div></div>
+            <div class="cal-info"><div class="t">${entry.title}${entry.dueRaw ? dueBadge(entry.dueRaw, entry.stage) : ''}</div><div class="s">${entry.sub}</div></div>
           </div>`).join('')
       : '<div class="empty-note">Nothing scheduled yet.</div>';
   }
@@ -2487,7 +2511,11 @@
 
     const billable = nonCancelled.filter(p => Number(p.value) > 0);
     const invCard = document.getElementById('invoices-table-card');
-    document.getElementById('nav-count-invoices').textContent = billable.filter(p => p.paid_status !== 'paid').length;
+    const unpaidBillable = billable.filter(p => p.paid_status !== 'paid');
+    document.getElementById('nav-count-invoices').textContent = unpaidBillable.length;
+    const hasOverdueInvoice = unpaidBillable.some(p => p.due_date && new Date(p.due_date) < new Date().setHours(0,0,0,0));
+    document.getElementById('nav-count-invoices').style.background = hasOverdueInvoice ? '#C3492E' : '';
+    document.getElementById('nav-count-invoices').style.color = hasOverdueInvoice ? 'white' : '';
 
     invCard.innerHTML = billable.length
       ? `<table>
@@ -2497,7 +2525,7 @@
               <td class="name-cell">${p.title}</td>
               <td>${p.client_name || '—'}</td>
               <td>${money(p.value)}</td>
-              <td class="sub-cell">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
+              <td class="sub-cell">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${p.paid_status !== 'paid' ? dueBadge(p.due_date, p.stage) : ''}</td>
               <td><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
               <td style="white-space:nowrap;">
                 <button class="btn btn-ghost invoice-edit-btn" data-id="${p.id}" style="padding:5px 10px; font-size:11.5px;">Edit</button>
