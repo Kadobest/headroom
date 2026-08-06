@@ -360,6 +360,7 @@
   }
   .tag-flag.studio{ background:#E4E9F5; color:var(--navy); }
   .tag-flag.label{ background:#FDE9D9; color:var(--orange-dim); }
+  .tag-flag.events{ background:#DFF3F1; color:#137A6F; }
 
   .pill.free{ background:#EDEFF3; color:#5A6478; }
   .tag-svc.field{ background:#DCEEF2; color:#1C6E7D; }
@@ -794,6 +795,66 @@
   </div>
 </div>
 
+<!-- Public intake form — where a prospective client fills in their own
+     event or studio job details, or requests a change to a prior submission.
+     No login involved; shown instead of everything else when the URL has ?intake=1 -->
+<div id="public-intake-page" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:var(--navy-deep); padding:20px;">
+  <div class="login-card" style="max-width:460px;">
+    <span class="hr-word on-light" style="font-size:26px;">HE<span class="hr-a on-light"></span>DROOM</span>
+    <div class="login-sub">Tell us about your project</div>
+
+    <div class="login-error" id="intake-error"></div>
+    <div class="login-success" id="intake-success"></div>
+
+    <form id="intake-form">
+      <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#6B7690; margin-bottom:14px; cursor:pointer;">
+        <input type="checkbox" id="intake-is-change"> I already submitted this before and want to request a change
+      </label>
+
+      <div class="login-field">
+        <label id="intake-category-label">What kind of work is this?</label>
+        <select id="intake-category">
+          <option value="event">Live event (PA, setup, live mixing)</option>
+          <option value="music">Music production (mixing, mastering, recording)</option>
+          <option value="film">Film / video sound</option>
+          <option value="other">Something else</option>
+        </select>
+      </div>
+
+      <div class="login-field"><label>Your name</label><input type="text" id="intake-name" required placeholder="Full name — same as before if this is a change"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Email</label><input type="email" id="intake-email" placeholder="name@example.com"></div>
+        <div class="login-field"><label>Phone</label><input type="tel" id="intake-phone" placeholder="+255 ..."></div>
+      </div>
+
+      <div id="intake-change-note-wrap" class="login-field" style="display:none;">
+        <label>What's changing?</label>
+        <textarea id="intake-change-details" class="cvf-textarea" placeholder="Briefly, what's different — then update the fields below to the new details."></textarea>
+      </div>
+
+      <div id="intake-event-fields" style="display:none;">
+        <div class="field-row">
+          <div class="login-field"><label id="intake-event-date-label">Event date</label><input type="date" id="intake-event-date"></div>
+          <div class="login-field"><label>Time</label><input type="text" id="intake-event-time" placeholder="e.g. 4pm–10pm"></div>
+        </div>
+        <div class="login-field"><label>Location / venue</label><input type="text" id="intake-location" placeholder="Where's the event?"></div>
+      </div>
+
+      <div id="intake-studio-fields" style="display:none;">
+        <div class="login-field"><label id="intake-deadline-label">When do you need this by?</label><input type="text" id="intake-deadline" placeholder="e.g. within 2 weeks, no rush, by Aug 20"></div>
+      </div>
+
+      <div class="login-field" id="intake-description-wrap">
+        <label id="intake-description-label">Tell us more</label>
+        <textarea id="intake-description" class="cvf-textarea" placeholder="What do you need, any requirements, anything we should know"></textarea>
+      </div>
+
+      <button type="submit" class="login-submit" id="intake-submit">Submit</button>
+    </form>
+    <div class="login-note">Kado will review this and follow up with you directly.</div>
+  </div>
+</div>
+
 <div id="login-screen">
   <div class="login-card">
     <span class="hr-word on-light" style="font-size:26px;">HE<span class="hr-a on-light"></span>DROOM</span>
@@ -925,11 +986,25 @@
       </div>
       <div id="proj-single-only-fields">
         <div class="login-field"><label>Artist (optional)</label><input type="text" id="proj-artist" placeholder="e.g. the specific artist this song is for"></div>
-        <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, Live Event, Voice-over"></div>
+        <div class="login-field"><label>Service</label><input type="text" id="proj-service" placeholder="e.g. Mixing, Film Sound, PA setup & live mixing, Voice-over"></div>
+        <div class="login-field" id="proj-venue-wrap" style="display:none;"><label>Venue / Location</label><input type="text" id="proj-venue" placeholder="e.g. Mlimani City Conference Centre"></div>
+        <div class="login-field" id="proj-equipment-source-wrap" style="display:none;">
+          <label>Equipment for this event</label>
+          <select id="proj-equipment-source">
+            <option value="">— Select —</option>
+            <option value="own">We're providing the equipment</option>
+            <option value="client">Client already has equipment — operate/mix only</option>
+            <option value="mixed">Mixed — some ours, some theirs</option>
+          </select>
+        </div>
       </div>
       <div class="field-row">
         <div class="login-field"><label>Type</label>
-          <select id="proj-type"><option value="studio">Studio</option><option value="label">Label</option></select>
+          <select id="proj-type">
+            <option value="studio">Studio</option>
+            <option value="label">Label</option>
+            <option value="events">Events (live sound)</option>
+          </select>
         </div>
         <div class="login-field"><label>Stage</label>
           <select id="proj-stage">
@@ -1096,6 +1171,60 @@
   </div>
 </div>
 
+<!-- Add/Edit Equipment modal -->
+<div class="data-modal-scrim" id="equipment-modal-scrim">
+  <div class="data-modal">
+    <h3 id="equipment-modal-title">Add Equipment</h3>
+    <form id="equipment-form">
+      <div class="login-field"><label>Name</label><input type="text" id="equipment-name" required placeholder="e.g. JBL EON615 speaker"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Category</label><input type="text" id="equipment-category" placeholder="e.g. Speaker, Mixer, Microphone, Lighting"></div>
+        <div class="login-field"><label>Quantity owned</label><input type="number" id="equipment-quantity" placeholder="1" value="1"></div>
+      </div>
+      <div class="login-field"><label>Daily rate (TSh)</label><input type="number" id="equipment-rate" placeholder="0"></div>
+      <div class="login-field"><label>Condition / notes</label><input type="text" id="equipment-notes" placeholder="e.g. Good condition, needs new cable"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="equipment-delete" style="display:none; color:#C3492E;">Delete</button>
+        <button type="button" class="btn btn-ghost" id="equipment-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="equipment-submit">Save equipment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Booking modal -->
+<div class="data-modal-scrim" id="booking-modal-scrim">
+  <div class="data-modal">
+    <h3 id="booking-modal-title">New Booking</h3>
+    <form id="booking-form">
+      <div class="login-field"><label>Client name</label><input type="text" id="booking-client" required placeholder="Who's renting"></div>
+      <div class="login-field"><label>Items</label><input type="text" id="booking-items" placeholder="e.g. 2x PA speakers, 1x mixer, 4x mics"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Date out</label><input type="date" id="booking-date-out"></div>
+        <div class="login-field"><label>Date back</label><input type="date" id="booking-date-back"></div>
+      </div>
+      <div class="field-row">
+        <div class="login-field"><label>Fee (TSh)</label><input type="number" id="booking-fee" placeholder="0"></div>
+        <div class="login-field"><label>Deposit (TSh)</label><input type="number" id="booking-deposit" placeholder="0"></div>
+      </div>
+      <div class="login-field"><label>Status</label>
+        <select id="booking-status">
+          <option value="booked">Booked</option>
+          <option value="out">Out</option>
+          <option value="returned">Returned</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="login-field"><label>Notes (optional)</label><input type="text" id="booking-notes" placeholder="Condition on return, special requests, etc."></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="booking-delete" style="display:none; color:#C3492E;">Delete</button>
+        <button type="button" class="btn btn-ghost" id="booking-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="booking-submit">Save booking</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Change password modal (any logged-in role) -->
 <div class="data-modal-scrim" id="password-modal-scrim">
   <div class="data-modal">
@@ -1140,6 +1269,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7l3-4h12l3 4M3 7v13a1 1 0 001 1h16a1 1 0 001-1V7M3 7h18"/></svg>
       Projects <span class="count" id="nav-count-projects">0</span>
     </div>
+    <div class="nav-item" data-view="intake">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      Job Requests <span class="count" id="nav-count-intake" style="display:none;">0</span>
+    </div>
     <div class="nav-item" data-view="tasks">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
       Tasks <span class="count" id="nav-count-tasks">0</span>
@@ -1167,6 +1300,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="18" cy="8" r="2.5"/><path d="M16.5 14c2.7.4 4.5 2.3 4.5 6"/></svg>
       Artist Roster
       <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="#8FA0C0" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="label">Events</div>
+    <div class="nav-item" data-view="rentals">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5a2 2 0 012-2h8a2 2 0 012 2v2"/><path d="M6 17v2M18 17v2"/></svg>
+      PA Rentals
     </div>
   </div>
 
@@ -1337,6 +1478,28 @@
       </div>
     </div>
 
+    <!-- ================= JOB REQUESTS (intake) ================= -->
+    <div class="view" id="view-intake">
+      <div class="card">
+        <h3>Share this link with prospective clients</h3>
+        <div style="display:flex; gap:8px;">
+          <div id="intake-link-display" style="flex:1; background:#F5F6F8; border:1px solid #E3E6EC; border-radius:6px; padding:9px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4A5470; word-break:break-all;"></div>
+          <button class="btn btn-ghost" id="intake-copy-btn">Copy</button>
+        </div>
+        <div class="login-note" style="text-align:left; margin-top:10px;">Anyone who fills it in — event or studio work — lands here for you to review. The same link also lets someone request a change to something they already submitted; they just tick the box on the form.</div>
+      </div>
+
+      <div class="section-title">New requests</div>
+      <div class="card" id="intake-new-card">
+        <div class="empty-note">No new requests yet.</div>
+      </div>
+
+      <div class="section-title">Change requests</div>
+      <div class="card" id="intake-change-card">
+        <div class="empty-note">No change requests yet.</div>
+      </div>
+    </div>
+
     <!-- ================= CLIENTS ================= -->
     <div class="view" id="view-clients">
       <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-client-btn">+ Add Client</button></div>
@@ -1358,6 +1521,23 @@
       <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-track-btn">+ Add Track</button></div>
       <div class="card" id="tracks-table-card">
         <div class="empty-note">No tracks in the vault yet.</div>
+      </div>
+    </div>
+
+    <!-- ================= PA RENTALS ================= -->
+    <div class="view" id="view-rentals">
+      <div class="banner"><span class="swatch"></span><b>Not built yet, on purpose:</b> this doesn't stop you from double-booking the same gear on overlapping dates, and rental income doesn't feed into Finances yet. Both are exactly the kind of thing to add once you're actually using this day to day — flag it and we'll build it properly. Until then, double check the Bookings list yourself before confirming availability to a client.</div>
+
+      <div class="section-title">Equipment</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-equipment-btn">+ Add Equipment</button></div>
+      <div class="card" id="equipment-table-card">
+        <div class="empty-note">No equipment logged yet.</div>
+      </div>
+
+      <div class="section-title">Bookings</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-booking-btn">+ New Booking</button></div>
+      <div class="card" id="bookings-table-card">
+        <div class="empty-note">No bookings yet.</div>
       </div>
     </div>
 
@@ -1534,6 +1714,8 @@
     finances: ["Finances","Income, expenses, and per-project margin."],
     feedback: ["Feedback Portal","Shareable link, star rating, and notes."],
     team: ["Team","Review access requests and manage logins."],
+    rentals: ["PA Rentals","Equipment inventory and event hire bookings."],
+    intake: ["Job Requests","New enquiries and change requests from clients."],
     tasks: ["Tasks","Work across studio, label, publishing, and freelance."],
     calendar: ["Calendar","Sessions, deadlines, and release dates."]
   };
@@ -1637,7 +1819,7 @@
   // the normal login/app flow must never show itself — this flag stops that,
   // regardless of the order async auth checks happen to finish in.
   const publicLinkParams = new URLSearchParams(location.search);
-  const isPublicLinkMode = publicLinkParams.has('feedback') || publicLinkParams.has('invoice');
+  const isPublicLinkMode = publicLinkParams.has('feedback') || publicLinkParams.has('invoice') || publicLinkParams.has('intake');
 
   function showApp(){
     if (isPublicLinkMode) return;
@@ -2105,7 +2287,7 @@
   let editingProjectId = null;
 
   async function loadAllData(){
-    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList(), loadTasks()]);
+    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList(), loadTasks(), loadEquipment(), loadBookings(), loadIntakeRequests()]);
   }
 
   // ---- Projects ----
@@ -2144,9 +2326,9 @@
           ${activeList.map(p => `
             <tr class="rowhover" data-project-id="${p.id}">
               <td class="name-cell" style="cursor:pointer;">${p.title}</td>
-              <td>${p.client_name || '—'}${p.artist_name ? '<div class="sub-cell">' + p.artist_name + '</div>' : ''}</td>
+              <td>${p.client_name || '—'}${p.artist_name ? '<div class="sub-cell">' + p.artist_name + '</div>' : ''}${p.venue ? '<div class="sub-cell">📍 ' + p.venue + '</div>' : ''}${p.equipment_source ? '<div class="sub-cell">🔊 ' + (p.equipment_source === 'own' ? 'We provide equipment' : p.equipment_source === 'client' ? 'Client\'s equipment' : 'Mixed equipment') + '</div>' : ''}</td>
               <td>${p.service || '—'}</td>
-              <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : 'Studio'}</span></td>
+              <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : (p.project_type === 'events' ? 'Events' : 'Studio')}</span></td>
               <td>
                 <select class="stage-quick-select" data-project-id="${p.id}" style="font-size:11.5px; padding:4px 6px; border-radius:6px; border:1px solid #E3E6EC;">
                   <option value="received" ${p.stage==='received'?'selected':''}>Received</option>
@@ -2219,7 +2401,7 @@
     const activeCount = nonCancelled.filter(p => p.stage !== 'complete').length;
     document.getElementById('dash-active-projects').textContent = activeCount;
 
-    const billable = nonCancelled.filter(p => Number(p.value) > 0 && p.project_type === 'studio');
+    const billable = nonCancelled.filter(p => Number(p.value) > 0 && (p.project_type === 'studio' || p.project_type === 'events'));
     const outstanding = billable.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
     document.getElementById('dash-outstanding').textContent = money(outstanding);
 
@@ -2343,7 +2525,7 @@
       });
     });
 
-    const clientWork = nonCancelled.filter(p => p.project_type === 'studio' && Number(p.value) > 0);
+    const clientWork = nonCancelled.filter(p => (p.project_type === 'studio' || p.project_type === 'events') && Number(p.value) > 0);
     const labelWork = nonCancelled.filter(p => p.project_type === 'label');
     const totalIncome = clientWork.filter(p => p.paid_status === 'paid').reduce((s,p)=>s+Number(p.value||0),0);
     const outstanding = clientWork.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
@@ -2566,6 +2748,282 @@
       projectsCache.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
   }
 
+  // ---- PA Rentals: Equipment ----
+  let equipmentCache = [];
+  let editingEquipmentId = null;
+
+  async function loadEquipment(){
+    const { data } = await supabaseClient.from('equipment').select('*').order('created_at', { ascending: false });
+    const list = data || [];
+    equipmentCache = list;
+    const card = document.getElementById('equipment-table-card');
+    if (!card) return;
+    card.innerHTML = list.length
+      ? `<table>
+          <tr><th>Name</th><th>Category</th><th>Qty</th><th>Daily rate</th><th>Condition</th></tr>
+          ${list.map(eq => `<tr class="rowhover" data-equipment-id="${eq.id}" style="cursor:pointer;"><td class="name-cell">${eq.name}</td><td>${eq.category||'—'}</td><td>${eq.quantity||1}</td><td class="sensitive">${money(eq.daily_rate)}</td><td class="sub-cell">${eq.condition_notes||'—'}</td></tr>`).join('')}
+        </table>`
+      : '<div class="empty-note">No equipment logged yet.</div>';
+    card.querySelectorAll('tr[data-equipment-id]').forEach(el=>{
+      el.addEventListener('click', ()=> openEquipmentForEdit(el.dataset.equipmentId));
+    });
+  }
+
+  function resetEquipmentModal(){
+    editingEquipmentId = null;
+    document.getElementById('equipment-modal-title').textContent = 'Add Equipment';
+    document.getElementById('equipment-delete').style.display = 'none';
+    document.getElementById('equipment-form').reset();
+  }
+  function openEquipmentForEdit(id){
+    const eq = equipmentCache.find(x => x.id === id);
+    if (!eq) return;
+    editingEquipmentId = id;
+    document.getElementById('equipment-modal-title').textContent = 'Edit Equipment';
+    document.getElementById('equipment-delete').style.display = '';
+    document.getElementById('equipment-name').value = eq.name || '';
+    document.getElementById('equipment-category').value = eq.category || '';
+    document.getElementById('equipment-quantity').value = eq.quantity || 1;
+    document.getElementById('equipment-rate').value = eq.daily_rate || 0;
+    document.getElementById('equipment-notes').value = eq.condition_notes || '';
+    document.getElementById('equipment-modal-scrim').classList.add('show');
+  }
+
+  // ---- PA Rentals: Bookings ----
+  let bookingsCache = [];
+  let editingBookingId = null;
+
+  async function loadBookings(){
+    const { data } = await supabaseClient.from('rental_bookings').select('*').order('date_out', { ascending: true, nullsFirst: false });
+    const list = data || [];
+    bookingsCache = list;
+    const card = document.getElementById('bookings-table-card');
+    if (!card) return;
+    card.innerHTML = list.length
+      ? `<table>
+          <tr><th>Client</th><th>Items</th><th>Out</th><th>Back</th><th>Fee</th><th>Status</th></tr>
+          ${list.map(b => `
+            <tr class="rowhover" data-booking-id="${b.id}">
+              <td class="name-cell" style="cursor:pointer;">${b.client_name}</td>
+              <td class="sub-cell" style="cursor:pointer;">${b.items_text || '—'}</td>
+              <td class="sub-cell" style="cursor:pointer;">${b.date_out ? new Date(b.date_out).toLocaleDateString() : '—'}</td>
+              <td class="sub-cell" style="cursor:pointer;">${b.date_back ? new Date(b.date_back).toLocaleDateString() : '—'}</td>
+              <td class="sensitive" style="cursor:pointer;">${money(b.fee)}</td>
+              <td>
+                <select class="booking-status-quick" data-booking-id="${b.id}" style="font-size:11.5px; padding:4px 6px; border-radius:6px; border:1px solid #E3E6EC;">
+                  <option value="booked" ${b.status==='booked'?'selected':''}>Booked</option>
+                  <option value="out" ${b.status==='out'?'selected':''}>Out</option>
+                  <option value="returned" ${b.status==='returned'?'selected':''}>Returned</option>
+                  <option value="cancelled" ${b.status==='cancelled'?'selected':''}>Cancelled</option>
+                </select>
+              </td>
+            </tr>`).join('')}
+        </table>`
+      : '<div class="empty-note">No bookings yet.</div>';
+    card.querySelectorAll('tr[data-booking-id]').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        if (e.target.classList.contains('booking-status-quick')) return;
+        openBookingForEdit(el.dataset.bookingId);
+      });
+    });
+    card.querySelectorAll('.booking-status-quick').forEach(sel=>{
+      sel.addEventListener('click', (e)=> e.stopPropagation());
+      sel.addEventListener('change', async (e)=>{
+        e.stopPropagation();
+        await supabaseClient.from('rental_bookings').update({ status: sel.value }).eq('id', sel.dataset.bookingId);
+        await loadBookings();
+      });
+    });
+  }
+
+  function resetBookingModal(){
+    editingBookingId = null;
+    document.getElementById('booking-modal-title').textContent = 'New Booking';
+    document.getElementById('booking-delete').style.display = 'none';
+    document.getElementById('booking-form').reset();
+  }
+  function openBookingForEdit(id){
+    const b = bookingsCache.find(x => x.id === id);
+    if (!b) return;
+    editingBookingId = id;
+    document.getElementById('booking-modal-title').textContent = 'Edit Booking';
+    document.getElementById('booking-delete').style.display = '';
+    document.getElementById('booking-client').value = b.client_name || '';
+    document.getElementById('booking-items').value = b.items_text || '';
+    document.getElementById('booking-date-out').value = b.date_out || '';
+    document.getElementById('booking-date-back').value = b.date_back || '';
+    document.getElementById('booking-fee').value = b.fee || 0;
+    document.getElementById('booking-deposit').value = b.deposit || 0;
+    document.getElementById('booking-status').value = b.status || 'booked';
+    document.getElementById('booking-notes').value = b.notes || '';
+    document.getElementById('booking-modal-scrim').classList.add('show');
+  }
+
+  // ---- Job Requests (public intake form submissions) ----
+  let convertingIntakeId = null;
+
+  async function loadIntakeRequests(){
+    const linkDisplay = document.getElementById('intake-link-display');
+    if (linkDisplay) linkDisplay.textContent = `${location.origin}${location.pathname}?intake=1`;
+
+    const { data } = await supabaseClient
+      .from('intake_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    const list = data || [];
+
+    document.getElementById('nav-count-intake').style.display = list.length ? 'inline-block' : 'none';
+    document.getElementById('nav-count-intake').textContent = list.length;
+
+    const categoryLabel = { event: 'Live Event', music: 'Music Production', film: 'Film / Video', other: 'Other' };
+
+    const newRequests = list.filter(r => r.request_type === 'new');
+    const newCard = document.getElementById('intake-new-card');
+    if (newCard){
+      newCard.innerHTML = newRequests.length
+        ? newRequests.map(r => `
+            <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #EEF0F4;">
+              <div class="name-cell">${r.full_name} <span class="tag-flag studio">${categoryLabel[r.category] || 'Other'}</span></div>
+              <div class="sub-cell">${r.email || ''} ${r.phone ? '· ' + r.phone : ''}</div>
+              ${r.category === 'event'
+                ? `<div class="sub-cell" style="margin-top:6px;">📅 ${r.event_date ? new Date(r.event_date).toLocaleDateString() : 'No date given'} ${r.event_time ? '· ' + r.event_time : ''}${r.location ? ' · 📍 ' + r.location : ''}</div>`
+                : `<div class="sub-cell" style="margin-top:6px;">${r.deadline_preference ? 'Needed: ' + r.deadline_preference : ''}</div>`}
+              <div style="font-size:13px; margin-top:6px;">${r.description || ''}</div>
+              <div style="margin-top:10px; display:flex; gap:10px;">
+                <button class="btn btn-primary intake-convert-btn" data-id="${r.id}" style="padding:6px 12px; font-size:12px;">Convert to Project</button>
+                <button class="intake-decline-btn" data-id="${r.id}" style="border:none; background:none; color:#C3492E; font-size:11.5px; cursor:pointer;">Decline</button>
+              </div>
+            </div>`).join('')
+        : '<div class="empty-note">No new requests yet.</div>';
+      newCard.querySelectorAll('.intake-convert-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=> startIntakeConversion(btn.dataset.id));
+      });
+      newCard.querySelectorAll('.intake-decline-btn').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          await supabaseClient.from('intake_requests').update({ status: 'declined' }).eq('id', btn.dataset.id);
+          await loadIntakeRequests();
+        });
+      });
+    }
+
+    const changeRequests = list.filter(r => r.request_type === 'change');
+    const changeCard = document.getElementById('intake-change-card');
+    if (changeCard){
+      if (!changeRequests.length){
+        changeCard.innerHTML = '<div class="empty-note">No change requests yet.</div>';
+      } else {
+        // fetch a fresh, lightweight project list for matching (don't rely on
+        // projectsCache timing, since this can load before Projects does)
+        const { data: allProjects } = await supabaseClient.from('projects').select('id, title, client_name').order('created_at', { ascending: false });
+        const projectOptions = allProjects || [];
+
+        changeCard.innerHTML = changeRequests.map(r => {
+          const guess = projectOptions.find(p => p.client_name && r.full_name && p.client_name.toLowerCase() === r.full_name.toLowerCase());
+          const changesSummary = [];
+          if (r.event_date) changesSummary.push('New date: ' + new Date(r.event_date).toLocaleDateString());
+          if (r.event_time) changesSummary.push('New time: ' + r.event_time);
+          if (r.location) changesSummary.push('New location: ' + r.location);
+          if (r.deadline_preference) changesSummary.push('New timing: ' + r.deadline_preference);
+          if (r.description) changesSummary.push('Notes: ' + r.description);
+          return `
+            <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #EEF0F4;">
+              <div class="name-cell">${r.full_name}</div>
+              <div class="sub-cell">${r.email || ''} ${r.phone ? '· ' + r.phone : ''}</div>
+              <div style="font-size:13px; margin-top:6px; font-style:italic;">"${r.change_details || 'No note given'}"</div>
+              ${changesSummary.length ? `<div class="sub-cell" style="margin-top:6px;">${changesSummary.join(' · ')}</div>` : ''}
+              <div class="login-field" style="margin-top:10px; margin-bottom:8px;">
+                <label style="font-size:11px;">Which project is this for?</label>
+                <select class="intake-change-project-select" data-id="${r.id}" style="width:100%; padding:9px 10px; border:1px solid #E3E6EC; border-radius:8px; font-size:13px;">
+                  <option value="">— Select the project —</option>
+                  ${projectOptions.map(p => `<option value="${p.id}" ${guess && guess.id === p.id ? 'selected' : ''}>${p.title} — ${p.client_name || ''}</option>`).join('')}
+                </select>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <button class="btn btn-primary intake-approve-btn" data-id="${r.id}" style="padding:6px 12px; font-size:12px;">Approve &amp; Apply</button>
+                <button class="intake-reviewed-btn" data-id="${r.id}" style="border:none; background:none; color:#6B7690; font-size:11.5px; cursor:pointer;">Dismiss without applying</button>
+              </div>
+            </div>`;
+        }).join('');
+
+        changeCard.querySelectorAll('.intake-approve-btn').forEach(btn=>{
+          btn.addEventListener('click', ()=> applyIntakeChange(btn.dataset.id));
+        });
+        changeCard.querySelectorAll('.intake-reviewed-btn').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            await supabaseClient.from('intake_requests').update({ status: 'reviewed' }).eq('id', btn.dataset.id);
+            await loadIntakeRequests();
+          });
+        });
+      }
+    }
+  }
+
+  async function applyIntakeChange(requestId){
+    const select = document.querySelector(`.intake-change-project-select[data-id="${requestId}"]`);
+    const projectId = select?.value;
+    if (!projectId){
+      alert('Pick which project this change applies to first.');
+      return;
+    }
+    const { data: r } = await supabaseClient.from('intake_requests').select('*').eq('id', requestId).single();
+    if (!r) return;
+
+    const { data: project } = await supabaseClient.from('projects').select('*').eq('id', projectId).single();
+    if (!project) return;
+
+    const updates = {};
+    if (r.event_date) updates.due_date = r.event_date;
+    if (r.location) updates.venue = r.location;
+    const extraNote = [];
+    if (r.event_time) extraNote.push('Time: ' + r.event_time);
+    if (r.deadline_preference) extraNote.push('Timing: ' + r.deadline_preference);
+    if (r.description) extraNote.push(r.description);
+    if (r.change_details) extraNote.push('Change requested: ' + r.change_details);
+    if (extraNote.length){
+      updates.notes = (project.notes ? project.notes + ' — ' : '') + extraNote.join(' — ');
+    }
+
+    const { error } = await supabaseClient.from('projects').update(updates).eq('id', projectId);
+    if (error){ alert(error.message || "Couldn't apply this change."); return; }
+
+    await supabaseClient.from('intake_requests').update({ status: 'approved', related_project_id: projectId }).eq('id', requestId);
+    await loadIntakeRequests();
+    await loadProjects();
+  }
+
+  function startIntakeConversion(requestId){
+    supabaseClient.from('intake_requests').select('*').eq('id', requestId).single().then(({ data: r })=>{
+      if (!r) return;
+      convertingIntakeId = requestId;
+      resetProjectModal();
+      const isEvent = r.category === 'event';
+      document.getElementById('proj-title').value = isEvent ? `Event — ${r.full_name}` : `${r.full_name} — new job`;
+      document.getElementById('proj-client').value = r.full_name;
+      document.getElementById('proj-type').value = isEvent ? 'events' : 'studio';
+      toggleVenueField();
+      if (isEvent){
+        document.getElementById('proj-due').value = r.event_date || '';
+        document.getElementById('proj-venue').value = r.location || '';
+      }
+      const notesParts = [];
+      if (r.deadline_preference) notesParts.push('Requested timing: ' + r.deadline_preference);
+      if (r.description) notesParts.push(r.description);
+      if (r.email) notesParts.push('Email: ' + r.email);
+      if (r.phone) notesParts.push('Phone: ' + r.phone);
+      document.getElementById('proj-notes').value = notesParts.join(' — ');
+      document.getElementById('project-modal-scrim').classList.add('show');
+    });
+  }
+
+  document.getElementById('intake-copy-btn')?.addEventListener('click', ()=>{
+    const text = document.getElementById('intake-link-display').textContent;
+    navigator.clipboard?.writeText(text);
+    const btn = document.getElementById('intake-copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent = 'Copy'; }, 1500);
+  });
+
   function populateFeedbackProjectSelect(projects){
     const select = document.getElementById('feedback-project-select');
     if (!select) return;
@@ -2617,7 +3075,14 @@
   document.getElementById('artist-cancel').addEventListener('click', resetArtistModal);
   wireModal('track-modal-scrim', 'track-cancel');
   wireModal('task-modal-scrim', 'task-cancel');
-  document.getElementById('project-cancel').addEventListener('click', resetProjectModal);
+  wireModal('equipment-modal-scrim', 'equipment-cancel');
+  wireModal('booking-modal-scrim', 'booking-cancel');
+  document.getElementById('equipment-cancel').addEventListener('click', resetEquipmentModal);
+  document.getElementById('booking-cancel').addEventListener('click', resetBookingModal);
+  document.getElementById('project-cancel').addEventListener('click', ()=>{
+    convertingIntakeId = null;
+    resetProjectModal();
+  });
   document.getElementById('track-cancel').addEventListener('click', resetTrackModal);
 
   function resetTrackModal(){
@@ -2661,6 +3126,13 @@
     document.getElementById('proj-cancel-reason-wrap').style.display = stage === 'cancelled' ? '' : 'none';
   }
   document.getElementById('proj-stage').addEventListener('change', toggleCancelReasonField);
+
+  function toggleVenueField(){
+    const type = document.getElementById('proj-type').value;
+    document.getElementById('proj-venue-wrap').style.display = type === 'events' ? '' : 'none';
+    document.getElementById('proj-equipment-source-wrap').style.display = type === 'events' ? '' : 'none';
+  }
+  document.getElementById('proj-type').addEventListener('change', toggleVenueField);
 
   // ---------- Batch mode: one row per song/item, each with its own fields ----------
   let batchRowCount = 0;
@@ -2763,6 +3235,7 @@
     document.getElementById('proj-sessions-list').innerHTML = '';
     setBatchMode(false);
     toggleCancelReasonField();
+    toggleVenueField();
   }
 
   function openProjectForEdit(id){
@@ -2779,6 +3252,8 @@
     document.getElementById('proj-client-company-type').value = '';
     document.getElementById('proj-artist').value = p.artist_name || '';
     document.getElementById('proj-service').value = p.service || '';
+    document.getElementById('proj-venue').value = p.venue || '';
+    document.getElementById('proj-equipment-source').value = p.equipment_source || '';
     document.getElementById('proj-type').value = p.project_type || 'studio';
     document.getElementById('proj-stage').value = p.stage || 'received';
     document.getElementById('proj-due').value = p.due_date || '';
@@ -2787,6 +3262,7 @@
     document.getElementById('proj-notes').value = p.notes || '';
     document.getElementById('proj-cancel-reason').value = p.cancellation_reason || '';
     toggleCancelReasonField();
+    toggleVenueField();
     document.getElementById('proj-sessions-wrap').style.display = '';
     loadSessionsIntoForm(id);
     document.getElementById('project-modal-scrim').classList.add('show');
@@ -2841,6 +3317,7 @@
   });
 
   document.getElementById('new-btn').addEventListener('click', ()=>{
+    convertingIntakeId = null;
     resetProjectModal();
     document.getElementById('project-modal-scrim').classList.add('show');
   });
@@ -2863,6 +3340,42 @@
   if (addTaskBtn) addTaskBtn.addEventListener('click', ()=>{
     populateTaskProjectSelect();
     document.getElementById('task-modal-scrim').classList.add('show');
+  });
+  const addEquipmentBtn = document.getElementById('add-equipment-btn');
+  if (addEquipmentBtn) addEquipmentBtn.addEventListener('click', ()=>{
+    resetEquipmentModal();
+    document.getElementById('equipment-modal-scrim').classList.add('show');
+  });
+  const addBookingBtn = document.getElementById('add-booking-btn');
+  if (addBookingBtn) addBookingBtn.addEventListener('click', ()=>{
+    resetBookingModal();
+    document.getElementById('booking-modal-scrim').classList.add('show');
+  });
+
+  document.getElementById('equipment-delete').addEventListener('click', async ()=>{
+    if (!editingEquipmentId) return;
+    if (!confirm('Delete this equipment entry? This cannot be undone.')) return;
+    const btn = document.getElementById('equipment-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('equipment').delete().eq('id', editingEquipmentId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this equipment."); return; }
+    document.getElementById('equipment-modal-scrim').classList.remove('show');
+    resetEquipmentModal();
+    await loadEquipment();
+  });
+
+  document.getElementById('booking-delete').addEventListener('click', async ()=>{
+    if (!editingBookingId) return;
+    if (!confirm('Delete this booking? This cannot be undone.')) return;
+    const btn = document.getElementById('booking-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('rental_bookings').delete().eq('id', editingBookingId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this booking."); return; }
+    document.getElementById('booking-modal-scrim').classList.remove('show');
+    resetBookingModal();
+    await loadBookings();
   });
 
   document.getElementById('client-delete').addEventListener('click', async ()=>{
@@ -2970,16 +3483,28 @@
         title: document.getElementById('proj-title').value.trim(),
         artist_name: document.getElementById('proj-artist').value.trim(),
         service: document.getElementById('proj-service').value.trim(),
+        venue: document.getElementById('proj-venue').value.trim(),
+        equipment_source: document.getElementById('proj-equipment-source').value || null,
         due_date: document.getElementById('proj-due').value || null,
         value: Number(document.getElementById('proj-value').value || 0),
         paid_status: document.getElementById('proj-paid').value,
         ...sharedFields,
       };
-      ({ error } = editingProjectId
-        ? await supabaseClient.from('projects').update(payload).eq('id', editingProjectId)
-        : await supabaseClient.from('projects').insert(payload));
+      let newProjectId = null;
+      if (editingProjectId){
+        ({ error } = await supabaseClient.from('projects').update(payload).eq('id', editingProjectId));
+      } else {
+        const insertResult = await supabaseClient.from('projects').insert(payload).select().single();
+        error = insertResult.error;
+        newProjectId = insertResult.data?.id || null;
+      }
       if (!error && editingProjectId){
         await saveSessionsForProject(editingProjectId);
+      }
+      if (!error && convertingIntakeId && newProjectId){
+        await supabaseClient.from('intake_requests').update({ status: 'converted', converted_project_id: newProjectId }).eq('id', convertingIntakeId);
+        convertingIntakeId = null;
+        await loadIntakeRequests();
       }
     }
 
@@ -3080,6 +3605,52 @@
     e.target.reset();
     document.getElementById('task-modal-scrim').classList.remove('show');
     await loadTasks();
+  });
+
+  document.getElementById('equipment-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('equipment-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const payload = {
+      name: document.getElementById('equipment-name').value.trim(),
+      category: document.getElementById('equipment-category').value.trim(),
+      quantity: Number(document.getElementById('equipment-quantity').value || 1),
+      daily_rate: Number(document.getElementById('equipment-rate').value || 0),
+      condition_notes: document.getElementById('equipment-notes').value.trim(),
+    };
+    const { error } = editingEquipmentId
+      ? await supabaseClient.from('equipment').update(payload).eq('id', editingEquipmentId)
+      : await supabaseClient.from('equipment').insert(payload);
+    btn.disabled = false; btn.textContent = 'Save equipment';
+    if (error){ alert(error.message || "Couldn't save this equipment."); return; }
+    document.getElementById('equipment-modal-scrim').classList.remove('show');
+    resetEquipmentModal();
+    await loadEquipment();
+  });
+
+  document.getElementById('booking-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('booking-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const payload = {
+      client_name: document.getElementById('booking-client').value.trim(),
+      items_text: document.getElementById('booking-items').value.trim(),
+      date_out: document.getElementById('booking-date-out').value || null,
+      date_back: document.getElementById('booking-date-back').value || null,
+      fee: Number(document.getElementById('booking-fee').value || 0),
+      deposit: Number(document.getElementById('booking-deposit').value || 0),
+      status: document.getElementById('booking-status').value,
+      notes: document.getElementById('booking-notes').value.trim(),
+    };
+    const { error } = editingBookingId
+      ? await supabaseClient.from('rental_bookings').update(payload).eq('id', editingBookingId)
+      : await supabaseClient.from('rental_bookings').insert(payload);
+    btn.disabled = false; btn.textContent = 'Save booking';
+    if (error){ alert(error.message || "Couldn't save this booking."); return; }
+    document.getElementById('booking-modal-scrim').classList.remove('show');
+    resetBookingModal();
+    await loadBookings();
+    await ensureClientExists(document.getElementById('booking-client').value.trim(), '', '');
   });
 
   // =========================================================
@@ -3217,6 +3788,80 @@
     }
 
     document.getElementById('public-invoice-print').addEventListener('click', ()=> window.print());
+  })();
+
+  // ---------- Public intake form (shared link, no login) ----------
+  (function initPublicIntakePage(){
+    const params = new URLSearchParams(location.search);
+    if (!params.has('intake')) return;
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'none';
+    document.getElementById('public-intake-page').style.display = 'flex';
+
+    const categorySelect = document.getElementById('intake-category');
+    const eventFields = document.getElementById('intake-event-fields');
+    const studioFields = document.getElementById('intake-studio-fields');
+    const isChangeCheckbox = document.getElementById('intake-is-change');
+    const changeNoteWrap = document.getElementById('intake-change-note-wrap');
+
+    function refreshFieldVisibility(){
+      const cat = categorySelect.value;
+      eventFields.style.display = cat === 'event' ? '' : 'none';
+      studioFields.style.display = cat !== 'event' ? '' : 'none';
+
+      const isChange = isChangeCheckbox.checked;
+      changeNoteWrap.style.display = isChange ? '' : 'none';
+      document.getElementById('intake-category-label').textContent = isChange ? "What kind of work was this?" : "What kind of work is this?";
+      document.getElementById('intake-event-date-label').textContent = isChange ? "New event date" : "Event date";
+      document.getElementById('intake-deadline-label').textContent = isChange ? "New timing" : "When do you need this by?";
+      document.getElementById('intake-description-label').textContent = isChange ? "Anything else to update" : "Tell us more";
+      document.getElementById('intake-submit').textContent = isChange ? "Submit change request" : "Submit";
+    }
+    categorySelect.addEventListener('change', refreshFieldVisibility);
+    isChangeCheckbox.addEventListener('change', refreshFieldVisibility);
+    refreshFieldVisibility();
+
+    const intakeForm = document.getElementById('intake-form');
+    const intakeError = document.getElementById('intake-error');
+    const intakeSuccess = document.getElementById('intake-success');
+    const intakeSubmit = document.getElementById('intake-submit');
+
+    intakeForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      intakeError.classList.remove('show');
+      intakeSuccess.classList.remove('show');
+      intakeSubmit.disabled = true;
+      intakeSubmit.textContent = 'Sending…';
+
+      const isChange = isChangeCheckbox.checked;
+      const isEvent = categorySelect.value === 'event';
+      const payload = {
+        request_type: isChange ? 'change' : 'new',
+        category: categorySelect.value,
+        full_name: document.getElementById('intake-name').value.trim(),
+        email: document.getElementById('intake-email').value.trim() || null,
+        phone: document.getElementById('intake-phone').value.trim() || null,
+        event_date: isEvent ? (document.getElementById('intake-event-date').value || null) : null,
+        event_time: isEvent ? document.getElementById('intake-event-time').value.trim() : null,
+        location: isEvent ? document.getElementById('intake-location').value.trim() : null,
+        deadline_preference: !isEvent ? document.getElementById('intake-deadline').value.trim() : null,
+        description: document.getElementById('intake-description').value.trim(),
+        change_details: isChange ? document.getElementById('intake-change-details').value.trim() : null,
+      };
+
+      const { error } = await supabaseClient.from('intake_requests').insert(payload);
+      intakeSubmit.disabled = false;
+      intakeSubmit.textContent = isChange ? 'Submit change request' : 'Submit';
+      if (error){
+        intakeError.textContent = error.message || "Couldn't send this — please try again.";
+        intakeError.classList.add('show');
+        return;
+      }
+      intakeForm.style.display = 'none';
+      intakeSuccess.textContent = "Thanks — Kado will review this and follow up with you directly.";
+      intakeSuccess.classList.add('show');
+    });
   })();
 </script>
 

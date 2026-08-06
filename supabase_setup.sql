@@ -352,3 +352,113 @@ drop policy if exists "Editors can update sessions" on public.project_sessions;
 create policy "Editors can update sessions" on public.project_sessions for update using (public.can_edit());
 drop policy if exists "Editors can delete sessions" on public.project_sessions;
 create policy "Editors can delete sessions" on public.project_sessions for delete using (public.can_edit());
+
+-- ============================================================
+-- 17. NEW (v13): Events as a third project type — for live sound
+--    gigs (PA setup, operating, live mixing), separate from
+--    Studio and Label work. Also adds an optional venue field.
+-- ============================================================
+alter table public.projects drop constraint if exists projects_project_type_check;
+alter table public.projects add constraint projects_project_type_check
+  check (project_type in ('studio','label','events'));
+
+alter table public.projects add column if not exists venue text;
+
+-- ============================================================
+-- 18. NEW (v14): PA Rental business — built ahead of time so it's
+--    ready the moment you start this side of the work.
+--    Two tables: your equipment inventory, and bookings of it.
+-- ============================================================
+create table if not exists public.equipment (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  category text,              -- e.g. Speaker, Mixer, Microphone, Cable, Lighting
+  quantity int default 1,
+  daily_rate numeric default 0,
+  condition_notes text,
+  created_at timestamp with time zone default now()
+);
+alter table public.equipment enable row level security;
+drop policy if exists "Team can view equipment" on public.equipment;
+create policy "Team can view equipment" on public.equipment for select using (public.is_team_member());
+drop policy if exists "Editors can insert equipment" on public.equipment;
+create policy "Editors can insert equipment" on public.equipment for insert with check (public.can_edit());
+drop policy if exists "Editors can update equipment" on public.equipment;
+create policy "Editors can update equipment" on public.equipment for update using (public.can_edit());
+drop policy if exists "Owners can delete equipment" on public.equipment;
+create policy "Owners can delete equipment" on public.equipment for delete using (public.is_owner());
+
+create table if not exists public.rental_bookings (
+  id uuid primary key default gen_random_uuid(),
+  client_name text not null,
+  items_text text,            -- free description, e.g. "2x PA speakers, 1x mixer, 4x mics"
+  date_out date,
+  date_back date,
+  fee numeric default 0,
+  deposit numeric default 0,
+  status text not null default 'booked' check (status in ('booked','out','returned','cancelled')),
+  notes text,
+  created_at timestamp with time zone default now()
+);
+alter table public.rental_bookings enable row level security;
+drop policy if exists "Team can view bookings" on public.rental_bookings;
+create policy "Team can view bookings" on public.rental_bookings for select using (public.is_team_member());
+drop policy if exists "Editors can insert bookings" on public.rental_bookings;
+create policy "Editors can insert bookings" on public.rental_bookings for insert with check (public.can_edit());
+drop policy if exists "Editors can update bookings" on public.rental_bookings;
+create policy "Editors can update bookings" on public.rental_bookings for update using (public.can_edit());
+drop policy if exists "Owners can delete bookings" on public.rental_bookings;
+create policy "Owners can delete bookings" on public.rental_bookings for delete using (public.is_owner());
+
+-- ============================================================
+-- 19. NEW (v15): Flag whether YOU provide equipment for an event,
+--    or the client already has their own and just needs you to
+--    operate/mix — so nothing gets over-promised either way.
+-- ============================================================
+alter table public.projects add column if not exists equipment_source text;
+
+-- ============================================================
+-- 20. NEW (v16): Client intake requests — a public form link
+--    (no login) where a prospective client fills in their own
+--    event or studio job details, which you review and convert
+--    into a real project. Also supports "request a change" for
+--    something they already submitted, which comes to you for
+--    review rather than letting them edit a live project directly.
+-- ============================================================
+create table if not exists public.intake_requests (
+  id uuid primary key default gen_random_uuid(),
+  request_type text not null default 'new' check (request_type in ('new','change')),
+  category text,                  -- 'event' | 'music' | 'film' | 'other'
+  full_name text not null,
+  email text,
+  phone text,
+  event_date date,
+  event_time text,
+  location text,
+  deadline_preference text,
+  description text,
+  change_details text,
+  status text not null default 'pending' check (status in ('pending','reviewed','converted','declined')),
+  converted_project_id uuid references public.projects(id) on delete set null,
+  created_at timestamp with time zone default now()
+);
+alter table public.intake_requests enable row level security;
+drop policy if exists "Anyone can submit an intake request" on public.intake_requests;
+create policy "Anyone can submit an intake request" on public.intake_requests for insert to anon, authenticated with check (true);
+drop policy if exists "Team can view intake requests" on public.intake_requests;
+create policy "Team can view intake requests" on public.intake_requests for select using (public.is_team_member());
+drop policy if exists "Editors can update intake requests" on public.intake_requests;
+create policy "Editors can update intake requests" on public.intake_requests for update using (public.can_edit());
+drop policy if exists "Owners can delete intake requests" on public.intake_requests;
+create policy "Owners can delete intake requests" on public.intake_requests for delete using (public.is_owner());
+
+-- ============================================================
+-- 21. NEW (v17): Let change requests actually auto-apply.
+--    Reuses the same event/studio fields as new requests (so a
+--    change request captures structured new values, not just
+--    prose), plus a link to which project it applies to.
+-- ============================================================
+alter table public.intake_requests add column if not exists related_project_id uuid references public.projects(id) on delete set null;
+alter table public.intake_requests drop constraint if exists intake_requests_status_check;
+alter table public.intake_requests add constraint intake_requests_status_check
+  check (status in ('pending','reviewed','converted','declined','approved'));
