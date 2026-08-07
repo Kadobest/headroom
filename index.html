@@ -2301,6 +2301,61 @@
     if (diffDays <= 3) return ` <span class="due-flag soon">Due soon</span>`;
     return '';
   }
+
+  // Reliable copy-to-clipboard: tries the modern API first, but many mobile
+  // browsers block it outside a "secure enough" context or need a fallback —
+  // so this always falls back to a manual select+execCommand approach, and
+  // tells the caller honestly whether it actually worked.
+  async function copyToClipboard(text){
+    if (navigator.clipboard && window.isSecureContext){
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch(e){ /* fall through to the manual method below */ }
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch(e){
+      return false;
+    }
+  }
+
+  // Wires a "Copy" button: on success shows "Copied!"; on failure, selects
+  // the link text in place so the person can copy it manually themselves
+  // (some mobile browsers block programmatic copying entirely).
+  function wireCopyButton(btn, getText, selectableEl){
+    btn.addEventListener('click', async ()=>{
+      const text = getText();
+      const ok = await copyToClipboard(text);
+      if (ok){
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(()=>{ btn.textContent = original; }, 1500);
+      } else if (selectableEl){
+        const range = document.createRange();
+        range.selectNodeContents(selectableEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        btn.textContent = 'Select & copy manually';
+        setTimeout(()=>{ btn.textContent = 'Copy'; }, 2500);
+      } else {
+        alert('Could not copy automatically. Here is the link:\n\n' + text);
+      }
+    });
+  }
+
   const stageLabel = { received:'Received', in_progress:'In Progress', delivered:'Delivered', feedback:'Feedback', complete:'Complete' };
   let projectsCache = [];
   let editingProjectId = null;
@@ -2545,11 +2600,12 @@
       });
     });
     invCard.querySelectorAll('.invoice-copy-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+      btn.addEventListener('click', async ()=>{
         const link = `${location.origin}${location.pathname}?invoice=${btn.dataset.id}`;
-        navigator.clipboard?.writeText(link);
-        btn.textContent = 'Copied!';
-        setTimeout(()=>{ btn.textContent = 'Copy link'; }, 1500);
+        const ok = await copyToClipboard(link);
+        btn.textContent = ok ? 'Copied!' : 'Could not copy';
+        setTimeout(()=>{ btn.textContent = 'Copy link'; }, ok ? 1500 : 2500);
+        if (!ok) alert('Could not copy automatically. Here is the link:\n\n' + link);
       });
     });
 
@@ -3044,13 +3100,12 @@
     });
   }
 
-  document.getElementById('intake-copy-btn')?.addEventListener('click', ()=>{
-    const text = document.getElementById('intake-link-display').textContent;
-    navigator.clipboard?.writeText(text);
-    const btn = document.getElementById('intake-copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(()=>{ btn.textContent = 'Copy'; }, 1500);
-  });
+  {
+    const intakeCopyBtn = document.getElementById('intake-copy-btn');
+    if (intakeCopyBtn){
+      wireCopyButton(intakeCopyBtn, ()=>document.getElementById('intake-link-display').textContent, document.getElementById('intake-link-display'));
+    }
+  }
 
   function populateFeedbackProjectSelect(projects){
     const select = document.getElementById('feedback-project-select');
@@ -3078,13 +3133,13 @@
   }
   const feedbackCopyBtn = document.getElementById('feedback-copy-btn');
   if (feedbackCopyBtn){
-    feedbackCopyBtn.addEventListener('click', ()=>{
+    feedbackCopyBtn.addEventListener('click', async ()=>{
       const text = document.getElementById('feedback-link-display').textContent;
-      if (text && text.startsWith('http')){
-        navigator.clipboard?.writeText(text);
-        feedbackCopyBtn.textContent = 'Copied!';
-        setTimeout(()=>{ feedbackCopyBtn.textContent = 'Copy'; }, 1500);
-      }
+      if (!text || !text.startsWith('http')) return;
+      const ok = await copyToClipboard(text);
+      feedbackCopyBtn.textContent = ok ? 'Copied!' : 'Could not copy';
+      setTimeout(()=>{ feedbackCopyBtn.textContent = 'Copy'; }, ok ? 1500 : 2500);
+      if (!ok) alert('Could not copy automatically. Here is the link:\n\n' + text);
     });
   }
 
