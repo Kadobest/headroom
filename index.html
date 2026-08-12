@@ -1034,7 +1034,7 @@
           <div class="login-field"><label id="proj-value-label">Value (TSh)</label><input type="number" id="proj-value" placeholder="0"></div>
         </div>
         <div class="login-note" style="text-align:left; margin-top:-6px; margin-bottom:14px;">Leave the due date blank if this doesn't have one clean deadline — for work spanning multiple visits (like a session continued over two days), use "Scheduled sessions" below instead.</div>
-        <div class="login-field">
+        <div class="login-field" id="proj-paid-status-wrap">
           <label>Paid status</label>
           <select id="proj-paid">
             <option value="unpaid">Unpaid</option>
@@ -1042,11 +1042,18 @@
             <option value="partial">Partial</option>
             <option value="free">Free</option>
           </select>
+          <div class="login-note" style="text-align:left; margin-top:6px;">Log actual payments below and this updates itself — no need to guess "Partial" by eye.</div>
         </div>
       </div>
       <div class="login-field" id="proj-timeline-wrap" style="display:none;">
         <label>Timeline</label>
         <div id="proj-timeline-display" class="meta-grid" style="grid-template-columns:repeat(3,1fr);"></div>
+      </div>
+      <div class="login-field" id="proj-payments-wrap" style="display:none;">
+        <label>Payments received</label>
+        <div id="proj-payments-summary" class="sub-cell" style="margin-bottom:8px;"></div>
+        <div id="proj-payments-list"></div>
+        <button type="button" class="btn btn-ghost" id="proj-payment-add-row" style="margin-top:6px; padding:6px 12px; font-size:12px;">+ Add a payment</button>
       </div>
       <div class="login-field" id="proj-sessions-wrap" style="display:none;">
         <label>Scheduled sessions</label>
@@ -2514,7 +2521,7 @@
     document.getElementById('dash-active-projects').textContent = activeCount;
 
     const billable = nonCancelled.filter(p => Number(p.value) > 0 && (p.project_type === 'studio' || p.project_type === 'events'));
-    const outstanding = billable.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
+    const outstanding = billable.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Math.max(0, Number(p.value||0) - Number(p.amount_paid||0)),0);
     document.getElementById('dash-outstanding').textContent = money(outstanding);
 
     const now = new Date();
@@ -2617,7 +2624,7 @@
             <tr class="rowhover">
               <td class="name-cell">${p.title}</td>
               <td>${p.client_name || '—'}</td>
-              <td>${money(p.value)}</td>
+              <td>${money(p.value)}${p.paid_status === 'partial' ? `<div class="sub-cell">${money(p.amount_paid)} received · ${money(Math.max(0, p.value - (p.amount_paid||0)))} left</div>` : ''}</td>
               <td class="sub-cell">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${p.paid_status !== 'paid' ? dueBadge(p.due_date, p.stage) : ''}</td>
               <td><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
               <td style="white-space:nowrap;">
@@ -2650,7 +2657,7 @@
     const clientWork = nonCancelled.filter(p => (p.project_type === 'studio' || p.project_type === 'events') && Number(p.value) > 0);
     const labelWork = nonCancelled.filter(p => p.project_type === 'label');
     const totalIncome = clientWork.filter(p => p.paid_status === 'paid').reduce((s,p)=>s+Number(p.value||0),0);
-    const outstanding = clientWork.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Number(p.value||0),0);
+    const outstanding = clientWork.filter(p => p.paid_status !== 'paid').reduce((s,p)=>s+Math.max(0, Number(p.value||0) - Number(p.amount_paid||0)),0);
     const labelSpend = labelWork.reduce((s,p)=>s+Number(p.value||0),0);
 
     document.getElementById('fin-income').textContent = money(totalIncome);
@@ -3247,6 +3254,9 @@
     document.getElementById('proj-cancel-reason-wrap').style.display = stage === 'cancelled' ? '' : 'none';
   }
   document.getElementById('proj-stage').addEventListener('change', toggleCancelReasonField);
+  document.getElementById('proj-value').addEventListener('input', ()=>{
+    if (document.getElementById('proj-payments-wrap').style.display !== 'none') refreshPaymentsSummary();
+  });
 
   function toggleVenueField(){
     const type = document.getElementById('proj-type').value;
@@ -3344,6 +3354,84 @@
     }
   }
 
+  // ---------- Payments received (actual amounts, not just a status word) ----------
+  let paymentRowCount = 0;
+  function addPaymentRow(prefill){
+    const rowId = paymentRowCount++;
+    const wrap = document.createElement('div');
+    wrap.className = 'payment-row';
+    wrap.dataset.rowId = rowId;
+    wrap.dataset.paymentId = prefill?.id || '';
+    wrap.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px;';
+    wrap.innerHTML = `
+      <input type="date" class="payment-date" value="${prefill?.payment_date || ''}" style="width:140px; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px; font-size:13.5px;">
+      <input type="number" class="payment-amount" placeholder="Amount (TSh)" value="${prefill?.amount || ''}" style="width:130px; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px; font-size:13.5px;">
+      <input type="text" class="payment-note" placeholder="e.g. Deposit, Mobile money" value="${prefill?.note || ''}" style="flex:1; padding:10px 12px; border:1px solid #E3E6EC; border-radius:8px; font-size:13.5px;">
+      <button type="button" class="payment-remove" style="border:none; background:none; color:#C3492E; font-size:12px; cursor:pointer; padding:8px 4px;">✕</button>
+    `;
+    document.getElementById('proj-payments-list').appendChild(wrap);
+    wrap.querySelector('.payment-remove').addEventListener('click', ()=>{
+      wrap.remove();
+      refreshPaymentsSummary();
+    });
+    wrap.querySelector('.payment-amount').addEventListener('input', refreshPaymentsSummary);
+  }
+  document.getElementById('proj-payment-add-row').addEventListener('click', ()=>{
+    addPaymentRow();
+    refreshPaymentsSummary();
+  });
+
+  function refreshPaymentsSummary(){
+    const rows = document.querySelectorAll('#proj-payments-list .payment-row');
+    let total = 0;
+    rows.forEach(row => { total += Number(row.querySelector('.payment-amount').value || 0); });
+    const value = Number(document.getElementById('proj-value').value || 0);
+    const remaining = Math.max(0, value - total);
+    document.getElementById('proj-payments-summary').textContent =
+      `Received so far: ${money(total)} · Remaining: ${money(remaining)}`;
+  }
+
+  async function loadPaymentsIntoForm(projectId){
+    document.getElementById('proj-payments-list').innerHTML = '';
+    const { data } = await supabaseClient.from('project_payments').select('*').eq('project_id', projectId).order('payment_date', { ascending: true });
+    (data || []).forEach(p => addPaymentRow(p));
+    refreshPaymentsSummary();
+  }
+
+  // Saves the payment rows, then recomputes the running total and lets the
+  // real numbers decide paid_status — "Partial" now means something, not
+  // just a guess. Returns the new total so the caller can update the form.
+  async function savePaymentsForProject(projectId){
+    const rows = document.querySelectorAll('#proj-payments-list .payment-row');
+    for (const row of rows){
+      const paymentId = row.dataset.paymentId;
+      const amount = Number(row.querySelector('.payment-amount').value || 0);
+      const payload = {
+        project_id: projectId,
+        amount,
+        payment_date: row.querySelector('.payment-date').value || null,
+        note: row.querySelector('.payment-note').value.trim(),
+      };
+      if (paymentId){
+        await supabaseClient.from('project_payments').update(payload).eq('id', paymentId);
+      } else if (amount > 0 || payload.payment_date || payload.note){
+        await supabaseClient.from('project_payments').insert(payload);
+      }
+    }
+    const { data: allPayments } = await supabaseClient.from('project_payments').select('amount').eq('project_id', projectId);
+    const totalPaid = (allPayments || []).reduce((s,p)=>s+Number(p.amount||0), 0);
+
+    const { data: proj } = await supabaseClient.from('projects').select('value, paid_status').eq('id', projectId).single();
+    const value = Number(proj?.value || 0);
+    let newStatus = proj?.paid_status;
+    if (newStatus !== 'free'){ // never override an explicit "free" status
+      if (totalPaid <= 0) newStatus = 'unpaid';
+      else if (totalPaid >= value && value > 0) newStatus = 'paid';
+      else newStatus = 'partial';
+    }
+    await supabaseClient.from('projects').update({ amount_paid: totalPaid, paid_status: newStatus }).eq('id', projectId);
+  }
+
   function resetProjectModal(){
     editingProjectId = null;
     document.getElementById('project-modal-title').textContent = 'New Project';
@@ -3354,6 +3442,8 @@
     document.getElementById('proj-batch-rows').innerHTML = '';
     document.getElementById('proj-sessions-wrap').style.display = 'none';
     document.getElementById('proj-sessions-list').innerHTML = '';
+    document.getElementById('proj-payments-wrap').style.display = 'none';
+    document.getElementById('proj-payments-list').innerHTML = '';
     document.getElementById('proj-timeline-wrap').style.display = 'none';
     setBatchMode(false);
     toggleCancelReasonField();
@@ -3387,6 +3477,8 @@
     toggleVenueField();
     document.getElementById('proj-sessions-wrap').style.display = '';
     loadSessionsIntoForm(id);
+    document.getElementById('proj-payments-wrap').style.display = '';
+    loadPaymentsIntoForm(id);
 
     const timelineSteps = [
       ['Received', p.received_at], ['Started', p.started_at], ['Delivered', p.delivered_at],
@@ -3636,6 +3728,7 @@
       }
       if (!error && editingProjectId){
         await saveSessionsForProject(editingProjectId);
+        await savePaymentsForProject(editingProjectId);
       }
       if (!error && convertingIntakeId && newProjectId){
         await supabaseClient.from('intake_requests').update({ status: 'converted', converted_project_id: newProjectId }).eq('id', convertingIntakeId);
