@@ -367,6 +367,7 @@
   }
   .due-flag.overdue{ background:#FDE7E3; color:#C3492E; }
   .due-flag.soon{ background:#FFF3D6; color:#9A7514; }
+  .due-flag.waiting{ background:#E4E9F5; color:var(--navy); }
 
   .pill.free{ background:#EDEFF3; color:#5A6478; }
   .tag-svc.field{ background:#DCEEF2; color:#1C6E7D; }
@@ -1042,6 +1043,10 @@
             <option value="free">Free</option>
           </select>
         </div>
+      </div>
+      <div class="login-field" id="proj-timeline-wrap" style="display:none;">
+        <label>Timeline</label>
+        <div id="proj-timeline-display" class="meta-grid" style="grid-template-columns:repeat(3,1fr);"></div>
       </div>
       <div class="login-field" id="proj-sessions-wrap" style="display:none;">
         <label>Scheduled sessions</label>
@@ -2294,12 +2299,43 @@
   function dueBadge(dateStr, stage){
     if (!dateStr) return '';
     if (stage === 'complete' || stage === 'cancelled') return '';
+    // A project waiting on client feedback isn't "overdue" through any
+    // fault of ours — the due date reflects the original work, not the
+    // client's response time, which we can't control. See awaitingFeedbackBadge().
+    if (stage === 'feedback') return '';
     const due = new Date(dateStr);
     const today = new Date(); today.setHours(0,0,0,0);
     const diffDays = Math.round((due - today) / 86400000);
     if (diffDays < 0) return ` <span class="due-flag overdue">Overdue</span>`;
     if (diffDays <= 3) return ` <span class="due-flag soon">Due soon</span>`;
     return '';
+  }
+
+  // For a project sitting in the Feedback stage, shows how long it's
+  // been waiting on the client — not framed as overdue, since the
+  // delay isn't something the studio controls.
+  function awaitingFeedbackBadge(stage, feedbackAt){
+    if (stage !== 'feedback' || !feedbackAt) return '';
+    const since = new Date(feedbackAt);
+    const today = new Date();
+    const days = Math.max(0, Math.round((today - since) / 86400000));
+    const cls = days >= 14 ? 'overdue' : (days >= 5 ? 'soon' : 'waiting');
+    const label = days === 0 ? 'Awaiting feedback — today' : `Awaiting feedback — ${days}d`;
+    return ` <span class="due-flag ${cls}">${label}</span>`;
+  }
+
+  // When a project moves into a stage for the first time, stamp when that
+  // happened — but never overwrite a timestamp that's already set, so moving
+  // back and forth between stages doesn't erase the original history.
+  const stageTimestampColumn = {
+    received: 'received_at', in_progress: 'started_at', delivered: 'delivered_at',
+    feedback: 'feedback_at', complete: 'completed_at',
+  };
+  function stageTimestampPatch(newStage, currentProject){
+    const col = stageTimestampColumn[newStage];
+    if (!col) return {};
+    if (currentProject && currentProject[col]) return {}; // already set, leave it alone
+    return { [col]: new Date().toISOString() };
   }
 
   // Reliable copy-to-clipboard: tries the modern API first, but many mobile
@@ -2413,7 +2449,7 @@
                   <option value="cancelled" ${p.stage==='cancelled'?'selected':''}>Cancelled</option>
                 </select>
               </td>
-              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${dueBadge(p.due_date, p.stage)}</td>
+              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${dueBadge(p.due_date, p.stage)}${awaitingFeedbackBadge(p.stage, p.feedback_at)}</td>
               <td class="sensitive" style="cursor:pointer;">${money(p.value)}</td>
               <td class="sensitive" style="cursor:pointer;"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
             </tr>`).join('')}
@@ -2428,7 +2464,9 @@
         sel.addEventListener('click', (e)=> e.stopPropagation());
         sel.addEventListener('change', async (e)=>{
           e.stopPropagation();
-          await supabaseClient.from('projects').update({ stage: sel.value }).eq('id', sel.dataset.projectId);
+          const current = projectsCache.find(p => p.id === sel.dataset.projectId);
+          const update = { stage: sel.value, ...stageTimestampPatch(sel.value, current) };
+          await supabaseClient.from('projects').update(update).eq('id', sel.dataset.projectId);
           await loadProjects();
         });
       });
@@ -2516,7 +2554,7 @@
       ? upcoming.map(p => `
           <div class="cal-row">
             <div class="cal-date" style="${p.dueObj < now ? 'background:#C3492E;' : ''}"><div class="d">${p.dueObj.getDate()}</div><div class="m">${p.dueObj.toLocaleString('default',{month:'short'})}</div></div>
-            <div class="cal-info"><div class="t">${p.title}${dueBadge(p.due_date, p.stage)}</div><div class="s">${p.client_name || ''}</div></div>
+            <div class="cal-info"><div class="t">${p.title}${dueBadge(p.due_date, p.stage)}${awaitingFeedbackBadge(p.stage, p.feedback_at)}</div><div class="s">${p.client_name || ''}</div></div>
           </div>`).join('')
       : '<div class="empty-note">Nothing scheduled yet</div>';
 
@@ -2532,7 +2570,7 @@
 
     const dueEntries = nonCancelledProjects
       .filter(p => p.due_date)
-      .map(p => ({ dateObj: new Date(p.due_date), title: p.title, sub: `${p.client_name || ''} · ${stageLabel[p.stage]} · Due date`, stage: p.stage, dueRaw: p.due_date }));
+      .map(p => ({ dateObj: new Date(p.due_date), title: p.title, sub: `${p.client_name || ''} · ${stageLabel[p.stage]} · Due date`, stage: p.stage, dueRaw: p.due_date, feedbackAt: p.feedback_at }));
 
     const { data: sessions } = await supabaseClient
       .from('project_sessions')
@@ -2555,7 +2593,7 @@
       ? all.map(entry => `
           <div class="cal-row">
             <div class="cal-date" style="${entry.dueRaw && entry.dateObj < todayStart ? 'background:#C3492E;' : ''}"><div class="d">${entry.dateObj.getDate()}</div><div class="m">${entry.dateObj.toLocaleString('default',{month:'short'})}</div></div>
-            <div class="cal-info"><div class="t">${entry.title}${entry.dueRaw ? dueBadge(entry.dueRaw, entry.stage) : ''}</div><div class="s">${entry.sub}</div></div>
+            <div class="cal-info"><div class="t">${entry.title}${entry.dueRaw ? dueBadge(entry.dueRaw, entry.stage) : ''}${entry.stage ? awaitingFeedbackBadge(entry.stage, entry.feedbackAt) : ''}</div><div class="s">${entry.sub}</div></div>
           </div>`).join('')
       : '<div class="empty-note">Nothing scheduled yet.</div>';
   }
@@ -3316,6 +3354,7 @@
     document.getElementById('proj-batch-rows').innerHTML = '';
     document.getElementById('proj-sessions-wrap').style.display = 'none';
     document.getElementById('proj-sessions-list').innerHTML = '';
+    document.getElementById('proj-timeline-wrap').style.display = 'none';
     setBatchMode(false);
     toggleCancelReasonField();
     toggleVenueField();
@@ -3348,6 +3387,16 @@
     toggleVenueField();
     document.getElementById('proj-sessions-wrap').style.display = '';
     loadSessionsIntoForm(id);
+
+    const timelineSteps = [
+      ['Received', p.received_at], ['Started', p.started_at], ['Delivered', p.delivered_at],
+      ['Feedback', p.feedback_at], ['Completed', p.completed_at],
+    ];
+    document.getElementById('proj-timeline-display').innerHTML = timelineSteps.map(([label, ts]) => `
+      <div class="meta-cell"><div class="k">${label}</div><div class="v">${ts ? new Date(ts).toLocaleDateString() : '—'}</div></div>
+    `).join('');
+    document.getElementById('proj-timeline-wrap').style.display = '';
+
     document.getElementById('project-modal-scrim').classList.add('show');
   }
 
@@ -3533,14 +3582,16 @@
     const isBatch = document.getElementById('proj-batch-toggle').checked && !editingProjectId;
 
     // Fields shared across the whole batch (same client, same overall type/stage)
+    const chosenStage = document.getElementById('proj-stage').value;
     const sharedFields = {
       client_name: clientName,
       project_type: document.getElementById('proj-type').value,
-      stage: document.getElementById('proj-stage').value,
+      stage: chosenStage,
       notes: document.getElementById('proj-notes').value.trim(),
-      cancellation_reason: document.getElementById('proj-stage').value === 'cancelled'
+      cancellation_reason: chosenStage === 'cancelled'
         ? document.getElementById('proj-cancel-reason').value.trim()
         : null,
+      ...stageTimestampPatch(chosenStage, null), // new records — nothing to preserve yet
     };
 
     let error;
@@ -3562,6 +3613,7 @@
       }
       ({ error } = await supabaseClient.from('projects').insert(rows));
     } else {
+      const existingProject = editingProjectId ? projectsCache.find(p => p.id === editingProjectId) : null;
       const payload = {
         title: document.getElementById('proj-title').value.trim(),
         artist_name: document.getElementById('proj-artist').value.trim(),
@@ -3572,6 +3624,7 @@
         value: Number(document.getElementById('proj-value').value || 0),
         paid_status: document.getElementById('proj-paid').value,
         ...sharedFields,
+        ...stageTimestampPatch(chosenStage, existingProject), // won't clobber an already-set timestamp
       };
       let newProjectId = null;
       if (editingProjectId){
