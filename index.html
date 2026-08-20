@@ -369,6 +369,23 @@
   .due-flag.soon{ background:#FFF3D6; color:#9A7514; }
   .due-flag.waiting{ background:#E4E9F5; color:var(--navy); }
 
+  /* ---------- Project stage filter chips ---------- */
+  .filter-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .filter-chip{
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:#6B7690;
+    background:white; border:1px solid #E3E6EC; border-radius:20px; padding:7px 14px;
+    cursor:pointer; display:flex; align-items:center; gap:6px;
+  }
+  .filter-chip:hover{ background:#F5F6F8; }
+  .filter-chip.active{ background:var(--navy); border-color:var(--navy); color:white; }
+  .filter-chip .chip-count{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; background:rgba(0,0,0,0.06);
+    padding:1px 6px; border-radius:10px;
+  }
+  .filter-chip.active .chip-count{ background:rgba(255,255,255,0.2); }
+  body.theme-dark .filter-chip{ background:#152238; border-color:#22385F; color:#DCE3F0; }
+  body.theme-dark .filter-chip.active{ background:var(--orange); border-color:var(--orange); }
+
   .pill.free{ background:#EDEFF3; color:#5A6478; }
   .tag-svc.field{ background:#DCEEF2; color:#1C6E7D; }
   .tag-svc.live{ background:#0B1E3D; color:#FFD9B3; }
@@ -1243,6 +1260,30 @@
   </div>
 </div>
 
+<!-- Add/Edit Expense modal -->
+<div class="data-modal-scrim" id="expense-modal-scrim">
+  <div class="data-modal">
+    <h3 id="expense-modal-title">Add Expense</h3>
+    <form id="expense-form">
+      <div class="login-field"><label>Description</label><input type="text" id="expense-description" required placeholder="e.g. Video director — Milele shoot"></div>
+      <div class="field-row">
+        <div class="login-field"><label>Category</label><input type="text" id="expense-category" placeholder="e.g. Video director, Session musician, Equipment, Software"></div>
+        <div class="login-field"><label>Amount (TSh)</label><input type="number" id="expense-amount" placeholder="0"></div>
+      </div>
+      <div class="login-field"><label>Date</label><input type="date" id="expense-date"></div>
+      <div class="login-field"><label>Link to a project (optional)</label>
+        <select id="expense-project"><option value="">— None —</option></select>
+      </div>
+      <div class="login-field"><label>Notes (optional)</label><input type="text" id="expense-notes" placeholder="Anything worth remembering"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="expense-delete" style="display:none; color:#C3492E;">Delete</button>
+        <button type="button" class="btn btn-ghost" id="expense-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="expense-submit">Save expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Change password modal (any logged-in role) -->
 <div class="data-modal-scrim" id="password-modal-scrim">
   <div class="data-modal">
@@ -1463,7 +1504,8 @@
 
     <!-- ================= PROJECTS ================= -->
     <div class="view" id="view-projects">
-      <div class="pipeline">
+      <button type="button" id="pipeline-toggle-btn" class="btn btn-ghost" style="margin-bottom:12px;">Show pipeline board ▾</button>
+      <div class="pipeline" id="pipeline-board" style="display:none;">
         <div class="stage" style="--stage-color:#8FA0C0">
           <div class="stage-head"><span class="name">Received</span><span class="n" id="stage-count-received">0</span></div>
           <div id="stage-jobs-received"><div class="empty-note">No projects yet</div></div>
@@ -1485,7 +1527,17 @@
           <div id="stage-jobs-complete"><div class="empty-note">No projects yet</div></div>
         </div>
       </div>
+
       <div class="section-title">All projects</div>
+      <div class="filter-chips" id="project-filter-chips">
+        <button class="filter-chip active" data-filter="active">Active <span class="chip-count" id="chip-count-active">0</span></button>
+        <button class="filter-chip" data-filter="all">All <span class="chip-count" id="chip-count-all">0</span></button>
+        <button class="filter-chip" data-filter="received">Received <span class="chip-count" id="chip-count-received">0</span></button>
+        <button class="filter-chip" data-filter="in_progress">In Progress <span class="chip-count" id="chip-count-in_progress">0</span></button>
+        <button class="filter-chip" data-filter="delivered">Delivered <span class="chip-count" id="chip-count-delivered">0</span></button>
+        <button class="filter-chip" data-filter="feedback">Feedback <span class="chip-count" id="chip-count-feedback">0</span></button>
+        <button class="filter-chip" data-filter="complete">Complete <span class="chip-count" id="chip-count-complete">0</span></button>
+      </div>
       <div class="card" id="projects-table-card">
         <div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>
       </div>
@@ -1612,10 +1664,11 @@
 
     <!-- ================= FINANCES ================= -->
     <div class="view owner-only-view" id="view-finances">
-      <div class="grid grid-3">
+      <div class="grid grid-4">
         <div class="card stat-card"><div class="bar"></div><div class="label">Total income</div><div class="value" id="fin-income">TSh 0</div></div>
         <div class="card stat-card"><div class="bar"></div><div class="label">Outstanding</div><div class="value" id="fin-outstanding">TSh 0</div></div>
         <div class="card stat-card"><div class="bar"></div><div class="label">Label spend</div><div class="value" id="fin-label-spend">TSh 0</div></div>
+        <div class="card stat-card"><div class="bar"></div><div class="label">Total expenses</div><div class="value" id="fin-expenses-total">TSh 0</div></div>
       </div>
 
       <div class="section-title">Client Work vs. Own Label</div>
@@ -1627,7 +1680,14 @@
         <div class="card">
           <h3>Own Label <span class="sub-cell">Label-tagged projects</span></h3>
           <div id="fin-label-work"><div class="empty-note">No label spend logged yet.</div></div>
+          <div class="sub-cell" style="margin-top:8px;" id="fin-label-net"></div>
         </div>
+      </div>
+
+      <div class="section-title">Expenses</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-expense-btn">+ Add Expense</button></div>
+      <div class="card" id="expenses-table-card">
+        <div class="empty-note">No expenses logged yet — track payments to video directors, session musicians, equipment, software, anything going out.</div>
       </div>
 
       <div class="section-title">Cancelled / lost work</div>
@@ -2401,10 +2461,87 @@
 
   const stageLabel = { received:'Received', in_progress:'In Progress', delivered:'Delivered', feedback:'Feedback', complete:'Complete' };
   let projectsCache = [];
+  let currentProjectFilter = 'active';
+
+  function renderProjectsTable(activeList){
+    const tableCard = document.getElementById('projects-table-card');
+    const filtered = currentProjectFilter === 'all'
+      ? activeList
+      : currentProjectFilter === 'active'
+        ? activeList.filter(p => p.stage !== 'complete')
+        : activeList.filter(p => p.stage === currentProjectFilter);
+
+    if (!activeList.length){
+      tableCard.innerHTML = '<div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>';
+      return;
+    }
+    if (!filtered.length){
+      tableCard.innerHTML = '<div class="empty-note">Nothing in this filter right now.</div>';
+      return;
+    }
+    tableCard.innerHTML = `
+      <table>
+        <tr><th>Project</th><th>Client</th><th>Service</th><th>Type</th><th>Stage</th><th>Due</th><th>Value</th><th>Paid</th></tr>
+        ${filtered.map(p => `
+          <tr class="rowhover" data-project-id="${p.id}">
+            <td class="name-cell" style="cursor:pointer;">${p.title}</td>
+            <td>${p.client_name || '—'}${p.artist_name ? '<div class="sub-cell">' + p.artist_name + '</div>' : ''}${p.venue ? '<div class="sub-cell">📍 ' + p.venue + '</div>' : ''}${p.equipment_source ? '<div class="sub-cell">🔊 ' + (p.equipment_source === 'own' ? 'We provide equipment' : p.equipment_source === 'client' ? 'Client\'s equipment' : 'Mixed equipment') + '</div>' : ''}</td>
+            <td>${p.service || '—'}</td>
+            <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : (p.project_type === 'events' ? 'Events' : 'Studio')}</span></td>
+            <td>
+              <select class="stage-quick-select" data-project-id="${p.id}" style="font-size:11.5px; padding:4px 6px; border-radius:6px; border:1px solid #E3E6EC;">
+                <option value="received" ${p.stage==='received'?'selected':''}>Received</option>
+                <option value="in_progress" ${p.stage==='in_progress'?'selected':''}>In Progress</option>
+                <option value="delivered" ${p.stage==='delivered'?'selected':''}>Delivered</option>
+                <option value="feedback" ${p.stage==='feedback'?'selected':''}>Feedback</option>
+                <option value="complete" ${p.stage==='complete'?'selected':''}>Complete</option>
+                <option value="cancelled" ${p.stage==='cancelled'?'selected':''}>Cancelled</option>
+              </select>
+            </td>
+            <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${dueBadge(p.due_date, p.stage)}${awaitingFeedbackBadge(p.stage, p.feedback_at)}</td>
+            <td class="sensitive" style="cursor:pointer;">${money(p.value)}</td>
+            <td class="sensitive" style="cursor:pointer;"><span class="pill ${p.paid_status}">${p.paid_status}</span>${p.paid_status === 'partial' ? `<div class="sub-cell">${money(p.amount_paid)} paid · ${money(Math.max(0, p.value - (p.amount_paid||0)))} left</div>` : ''}</td>
+          </tr>`).join('')}
+      </table>`;
+    tableCard.querySelectorAll('tr[data-project-id]').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        if (e.target.classList.contains('stage-quick-select')) return;
+        openProjectForEdit(el.dataset.projectId);
+      });
+    });
+    tableCard.querySelectorAll('.stage-quick-select').forEach(sel=>{
+      sel.addEventListener('click', (e)=> e.stopPropagation());
+      sel.addEventListener('change', async (e)=>{
+        e.stopPropagation();
+        const current = projectsCache.find(p => p.id === sel.dataset.projectId);
+        const update = { stage: sel.value, ...stageTimestampPatch(sel.value, current) };
+        await supabaseClient.from('projects').update(update).eq('id', sel.dataset.projectId);
+        await loadProjects();
+      });
+    });
+  }
+
+  document.querySelectorAll('#project-filter-chips .filter-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      currentProjectFilter = chip.dataset.filter;
+      document.querySelectorAll('#project-filter-chips .filter-chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      renderProjectsTable(projectsCache.filter(p => p.stage !== 'cancelled'));
+    });
+  });
+
+  const pipelineToggleBtn = document.getElementById('pipeline-toggle-btn');
+  pipelineToggleBtn.addEventListener('click', ()=>{
+    const board = document.getElementById('pipeline-board');
+    const showing = board.style.display !== 'none';
+    board.style.display = showing ? 'none' : '';
+    pipelineToggleBtn.textContent = showing ? 'Show pipeline board ▾' : 'Hide pipeline board ▴';
+  });
+
   let editingProjectId = null;
 
   async function loadAllData(){
-    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList(), loadTasks(), loadEquipment(), loadBookings(), loadIntakeRequests()]);
+    await Promise.all([loadProjects(), loadClients(), loadArtists(), loadTracks(), loadFeedbackList(), loadTasks(), loadEquipment(), loadBookings(), loadIntakeRequests(), loadExpenses()]);
   }
 
   // ---- Projects ----
@@ -2432,52 +2569,16 @@
       });
     });
 
-    const tableCard = document.getElementById('projects-table-card');
     const activeList = list.filter(p => p.stage !== 'cancelled');
-    if (!activeList.length){
-      tableCard.innerHTML = '<div class="empty-note">No projects yet — click "+ New Project" to add your first one.</div>';
-    } else {
-      tableCard.innerHTML = `
-        <table>
-          <tr><th>Project</th><th>Client</th><th>Service</th><th>Type</th><th>Stage</th><th>Due</th><th>Value</th><th>Paid</th></tr>
-          ${activeList.map(p => `
-            <tr class="rowhover" data-project-id="${p.id}">
-              <td class="name-cell" style="cursor:pointer;">${p.title}</td>
-              <td>${p.client_name || '—'}${p.artist_name ? '<div class="sub-cell">' + p.artist_name + '</div>' : ''}${p.venue ? '<div class="sub-cell">📍 ' + p.venue + '</div>' : ''}${p.equipment_source ? '<div class="sub-cell">🔊 ' + (p.equipment_source === 'own' ? 'We provide equipment' : p.equipment_source === 'client' ? 'Client\'s equipment' : 'Mixed equipment') + '</div>' : ''}</td>
-              <td>${p.service || '—'}</td>
-              <td><span class="tag-flag ${p.project_type}">${p.project_type === 'label' ? 'Label' : (p.project_type === 'events' ? 'Events' : 'Studio')}</span></td>
-              <td>
-                <select class="stage-quick-select" data-project-id="${p.id}" style="font-size:11.5px; padding:4px 6px; border-radius:6px; border:1px solid #E3E6EC;">
-                  <option value="received" ${p.stage==='received'?'selected':''}>Received</option>
-                  <option value="in_progress" ${p.stage==='in_progress'?'selected':''}>In Progress</option>
-                  <option value="delivered" ${p.stage==='delivered'?'selected':''}>Delivered</option>
-                  <option value="feedback" ${p.stage==='feedback'?'selected':''}>Feedback</option>
-                  <option value="complete" ${p.stage==='complete'?'selected':''}>Complete</option>
-                  <option value="cancelled" ${p.stage==='cancelled'?'selected':''}>Cancelled</option>
-                </select>
-              </td>
-              <td style="cursor:pointer;">${p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}${dueBadge(p.due_date, p.stage)}${awaitingFeedbackBadge(p.stage, p.feedback_at)}</td>
-              <td class="sensitive" style="cursor:pointer;">${money(p.value)}</td>
-              <td class="sensitive" style="cursor:pointer;"><span class="pill ${p.paid_status}">${p.paid_status}</span></td>
-            </tr>`).join('')}
-        </table>`;
-      tableCard.querySelectorAll('tr[data-project-id]').forEach(el=>{
-        el.addEventListener('click', (e)=>{
-          if (e.target.classList.contains('stage-quick-select')) return;
-          openProjectForEdit(el.dataset.projectId);
-        });
-      });
-      tableCard.querySelectorAll('.stage-quick-select').forEach(sel=>{
-        sel.addEventListener('click', (e)=> e.stopPropagation());
-        sel.addEventListener('change', async (e)=>{
-          e.stopPropagation();
-          const current = projectsCache.find(p => p.id === sel.dataset.projectId);
-          const update = { stage: sel.value, ...stageTimestampPatch(sel.value, current) };
-          await supabaseClient.from('projects').update(update).eq('id', sel.dataset.projectId);
-          await loadProjects();
-        });
-      });
-    }
+
+    // Chip counts always reflect the full picture, regardless of which filter is active
+    document.getElementById('chip-count-all').textContent = activeList.length;
+    document.getElementById('chip-count-active').textContent = activeList.filter(p => p.stage !== 'complete').length;
+    ['received','in_progress','delivered','feedback','complete'].forEach(stage=>{
+      document.getElementById('chip-count-' + stage).textContent = activeList.filter(p => p.stage === stage).length;
+    });
+
+    renderProjectsTable(activeList);
 
     // Cancelled / postponed projects — kept on record with a reason, out of the active pipeline
     const cancelledCard = document.getElementById('cancelled-projects-card');
@@ -2605,6 +2706,19 @@
       : '<div class="empty-note">Nothing scheduled yet.</div>';
   }
 
+  // Label revenue minus direct expenses linked to label-type projects —
+  // called after either projects or expenses finish loading, so it's
+  // correct regardless of which one settles first.
+  function updateLabelNet(){
+    const netEl = document.getElementById('fin-label-net');
+    if (!netEl) return;
+    const labelProjectIds = new Set(projectsCache.filter(p => p.project_type === 'label').map(p => p.id));
+    const labelRevenue = projectsCache.filter(p => p.project_type === 'label').reduce((s,p)=>s+Number(p.value||0),0);
+    const labelExpenses = expensesCache.filter(e => e.project_id && labelProjectIds.has(e.project_id)).reduce((s,e)=>s+Number(e.amount||0),0);
+    if (!labelRevenue && !labelExpenses) { netEl.textContent = ''; return; }
+    netEl.textContent = `Direct expenses on label work: ${money(labelExpenses)} · Net: ${money(labelRevenue - labelExpenses)}`;
+  }
+
   function renderInvoicesAndFinances(projects){
     const nonCancelled = projects.filter(p => p.stage !== 'cancelled');
     const cancelled = projects.filter(p => p.stage === 'cancelled');
@@ -2671,6 +2785,7 @@
     document.getElementById('fin-label-work').innerHTML = labelWork.length
       ? `<table>${labelWork.map(p=>`<tr><td class="sub-cell">${p.title}</td><td class="name-cell">${money(p.value)}</td><td><span class="pill ${p.paid_status}">${p.paid_status}</span></td></tr>`).join('')}</table>`
       : '<div class="empty-note">No label spend logged yet.</div>';
+    updateLabelNet();
 
     // Cancelled / lost work — kept for the record, not counted as active revenue or spend
     const cancelledCard = document.getElementById('fin-cancelled-work');
@@ -2988,6 +3103,72 @@
     document.getElementById('booking-modal-scrim').classList.add('show');
   }
 
+  // ---- Expenses (money going out — collaborators, gear, software, etc.) ----
+  let expensesCache = [];
+  let editingExpenseId = null;
+
+  async function loadExpenses(){
+    const { data } = await supabaseClient
+      .from('expenses')
+      .select('*, projects(title)')
+      .order('expense_date', { ascending: false, nullsFirst: false });
+    const list = data || [];
+    expensesCache = list;
+
+    const totalExpenses = list.reduce((s,e)=>s+Number(e.amount||0),0);
+    document.getElementById('fin-expenses-total').textContent = money(totalExpenses);
+
+    const card = document.getElementById('expenses-table-card');
+    if (card){
+      card.innerHTML = list.length
+        ? `<table>
+            <tr><th>Description</th><th>Category</th><th>Project</th><th>Date</th><th>Amount</th></tr>
+            ${list.map(e => `
+              <tr class="rowhover" data-expense-id="${e.id}" style="cursor:pointer;">
+                <td class="name-cell">${e.description}</td>
+                <td>${e.category || '—'}</td>
+                <td class="sub-cell">${e.projects ? e.projects.title : '—'}</td>
+                <td class="sub-cell">${e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '—'}</td>
+                <td class="sensitive">${money(e.amount)}</td>
+              </tr>`).join('')}
+          </table>`
+        : '<div class="empty-note">No expenses logged yet — track payments to video directors, session musicians, equipment, software, anything going out.</div>';
+      card.querySelectorAll('tr[data-expense-id]').forEach(el=>{
+        el.addEventListener('click', ()=> openExpenseForEdit(el.dataset.expenseId));
+      });
+    }
+    updateLabelNet();
+  }
+
+  function populateExpenseProjectSelect(){
+    const select = document.getElementById('expense-project');
+    if (!select) return;
+    select.innerHTML = '<option value="">— None —</option>' +
+      projectsCache.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+  }
+
+  function resetExpenseModal(){
+    editingExpenseId = null;
+    document.getElementById('expense-modal-title').textContent = 'Add Expense';
+    document.getElementById('expense-delete').style.display = 'none';
+    document.getElementById('expense-form').reset();
+  }
+  function openExpenseForEdit(id){
+    const e = expensesCache.find(x => x.id === id);
+    if (!e) return;
+    editingExpenseId = id;
+    populateExpenseProjectSelect();
+    document.getElementById('expense-modal-title').textContent = 'Edit Expense';
+    document.getElementById('expense-delete').style.display = '';
+    document.getElementById('expense-description').value = e.description || '';
+    document.getElementById('expense-category').value = e.category || '';
+    document.getElementById('expense-amount').value = e.amount || 0;
+    document.getElementById('expense-date').value = e.expense_date || '';
+    document.getElementById('expense-project').value = e.project_id || '';
+    document.getElementById('expense-notes').value = e.notes || '';
+    document.getElementById('expense-modal-scrim').classList.add('show');
+  }
+
   // ---- Job Requests (public intake form submissions) ----
   let convertingIntakeId = null;
 
@@ -3205,8 +3386,10 @@
   wireModal('task-modal-scrim', 'task-cancel');
   wireModal('equipment-modal-scrim', 'equipment-cancel');
   wireModal('booking-modal-scrim', 'booking-cancel');
+  wireModal('expense-modal-scrim', 'expense-cancel');
   document.getElementById('equipment-cancel').addEventListener('click', resetEquipmentModal);
   document.getElementById('booking-cancel').addEventListener('click', resetBookingModal);
+  document.getElementById('expense-cancel').addEventListener('click', resetExpenseModal);
   document.getElementById('project-cancel').addEventListener('click', ()=>{
     convertingIntakeId = null;
     resetProjectModal();
@@ -3575,6 +3758,25 @@
     resetBookingModal();
     document.getElementById('booking-modal-scrim').classList.add('show');
   });
+  const addExpenseBtn = document.getElementById('add-expense-btn');
+  if (addExpenseBtn) addExpenseBtn.addEventListener('click', ()=>{
+    resetExpenseModal();
+    populateExpenseProjectSelect();
+    document.getElementById('expense-modal-scrim').classList.add('show');
+  });
+
+  document.getElementById('expense-delete').addEventListener('click', async ()=>{
+    if (!editingExpenseId) return;
+    if (!confirm('Delete this expense? This cannot be undone.')) return;
+    const btn = document.getElementById('expense-delete');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    const { error } = await supabaseClient.from('expenses').delete().eq('id', editingExpenseId);
+    btn.disabled = false; btn.textContent = 'Delete';
+    if (error){ alert(error.message || "Couldn't delete this expense."); return; }
+    document.getElementById('expense-modal-scrim').classList.remove('show');
+    resetExpenseModal();
+    await loadExpenses();
+  });
 
   document.getElementById('equipment-delete').addEventListener('click', async ()=>{
     if (!editingEquipmentId) return;
@@ -3880,6 +4082,28 @@
     resetBookingModal();
     await loadBookings();
     await ensureClientExists(document.getElementById('booking-client').value.trim(), '', '');
+  });
+
+  document.getElementById('expense-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById('expense-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const payload = {
+      description: document.getElementById('expense-description').value.trim(),
+      category: document.getElementById('expense-category').value.trim(),
+      amount: Number(document.getElementById('expense-amount').value || 0),
+      expense_date: document.getElementById('expense-date').value || null,
+      project_id: document.getElementById('expense-project').value || null,
+      notes: document.getElementById('expense-notes').value.trim(),
+    };
+    const { error } = editingExpenseId
+      ? await supabaseClient.from('expenses').update(payload).eq('id', editingExpenseId)
+      : await supabaseClient.from('expenses').insert(payload);
+    btn.disabled = false; btn.textContent = 'Save expense';
+    if (error){ alert(error.message || "Couldn't save this expense."); return; }
+    document.getElementById('expense-modal-scrim').classList.remove('show');
+    resetExpenseModal();
+    await loadExpenses();
   });
 
   // =========================================================

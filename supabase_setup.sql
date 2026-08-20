@@ -341,3 +341,58 @@ alter table public.intake_requests add constraint intake_requests_status_check
 -- currently expects. Safe to re-run in full any time you're
 -- unsure whether something's missing.
 -- ============================================================
+
+-- ============================================================
+-- 23. NEW (v19): Real partial-payment tracking.
+--    Logs each payment received (date + amount + note) instead of
+--    "Partial" being just a label with no numbers behind it.
+--    projects.amount_paid is kept in sync automatically as the
+--    running total, so Finances and Invoices can show the real
+--    remaining balance, not just guess from a status word.
+-- ============================================================
+alter table public.projects add column if not exists amount_paid numeric default 0;
+
+create table if not exists public.project_payments (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  amount numeric not null default 0,
+  payment_date date,
+  note text,
+  created_at timestamp with time zone default now()
+);
+alter table public.project_payments enable row level security;
+drop policy if exists "Team can view payments" on public.project_payments;
+create policy "Team can view payments" on public.project_payments for select using (public.is_team_member());
+drop policy if exists "Editors can insert payments" on public.project_payments;
+create policy "Editors can insert payments" on public.project_payments for insert with check (public.can_edit());
+drop policy if exists "Editors can update payments" on public.project_payments;
+create policy "Editors can update payments" on public.project_payments for update using (public.can_edit());
+drop policy if exists "Editors can delete payments" on public.project_payments;
+create policy "Editors can delete payments" on public.project_payments for delete using (public.can_edit());
+
+-- ============================================================
+-- 24. NEW (v20): Expenses — for money going OUT, not just coming
+--    in. Paying a video director, a session instrumentalist,
+--    equipment, software, anything — optionally linked to a
+--    specific project (e.g. a label release) so its real cost
+--    is visible, not just the revenue side.
+-- ============================================================
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  description text not null,
+  category text,              -- e.g. "Session musician", "Video director", "Equipment", "Software"
+  amount numeric not null default 0,
+  expense_date date,
+  project_id uuid references public.projects(id) on delete set null,
+  notes text,
+  created_at timestamp with time zone default now()
+);
+alter table public.expenses enable row level security;
+drop policy if exists "Team can view expenses" on public.expenses;
+create policy "Team can view expenses" on public.expenses for select using (public.is_team_member());
+drop policy if exists "Editors can insert expenses" on public.expenses;
+create policy "Editors can insert expenses" on public.expenses for insert with check (public.can_edit());
+drop policy if exists "Editors can update expenses" on public.expenses;
+create policy "Editors can update expenses" on public.expenses for update using (public.can_edit());
+drop policy if exists "Owners can delete expenses" on public.expenses;
+create policy "Owners can delete expenses" on public.expenses for delete using (public.is_owner());
