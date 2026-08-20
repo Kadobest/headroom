@@ -396,3 +396,18 @@ drop policy if exists "Editors can update expenses" on public.expenses;
 create policy "Editors can update expenses" on public.expenses for update using (public.can_edit());
 drop policy if exists "Owners can delete expenses" on public.expenses;
 create policy "Owners can delete expenses" on public.expenses for delete using (public.is_owner());
+
+-- ============================================================
+-- 25. NEW (v21): Sponsorships — brand-building contributions to
+--    events, which can be cash, your own skills/time (in-kind),
+--    equipment use (in-kind), or a mix. Builds on the expenses
+--    table rather than duplicating it, since a sponsorship is
+--    still money/value going out — just for visibility, not a job.
+-- ============================================================
+alter table public.expenses add column if not exists is_sponsorship boolean default false;
+alter table public.expenses add column if not exists contribution_type text;
+alter table public.expenses drop constraint if exists expenses_contribution_type_check;
+alter table public.expenses add constraint expenses_contribution_type_check
+  check (contribution_type in ('cash','skills','equipment','mixed') or contribution_type is null);
+alter table public.expenses add column if not exists estimated_value numeric default 0;
+alter table public.expenses add column if not exists event_name text;

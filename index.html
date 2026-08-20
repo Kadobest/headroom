@@ -1264,11 +1264,31 @@
 <div class="data-modal-scrim" id="expense-modal-scrim">
   <div class="data-modal">
     <h3 id="expense-modal-title">Add Expense</h3>
+    <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#6B7690; margin-bottom:14px; cursor:pointer;">
+      <input type="checkbox" id="expense-is-sponsorship"> This is a sponsorship (brand exposure, not a paid job)
+    </label>
     <form id="expense-form">
-      <div class="login-field"><label>Description</label><input type="text" id="expense-description" required placeholder="e.g. Video director — Milele shoot"></div>
+      <div class="login-field"><label id="expense-description-label">Description</label><input type="text" id="expense-description" required placeholder="e.g. Video director — Milele shoot"></div>
+      <div class="login-field" id="expense-event-name-wrap" style="display:none;">
+        <label>Event name</label><input type="text" id="expense-event-name" placeholder="e.g. Bongo Beats Festival 2026">
+      </div>
+      <div class="login-field" id="expense-contribution-type-wrap" style="display:none;">
+        <label>What did you contribute?</label>
+        <select id="expense-contribution-type">
+          <option value="cash">Cash only</option>
+          <option value="skills">My skills / time only</option>
+          <option value="equipment">Equipment use only</option>
+          <option value="mixed">A mix of these</option>
+        </select>
+      </div>
       <div class="field-row">
         <div class="login-field"><label>Category</label><input type="text" id="expense-category" placeholder="e.g. Video director, Session musician, Equipment, Software"></div>
-        <div class="login-field"><label>Amount (TSh)</label><input type="number" id="expense-amount" placeholder="0"></div>
+        <div class="login-field"><label id="expense-amount-label">Amount (TSh)</label><input type="number" id="expense-amount" placeholder="0"></div>
+      </div>
+      <div class="login-field" id="expense-estimated-value-wrap" style="display:none;">
+        <label>Estimated value of skills/equipment given (TSh)</label>
+        <input type="number" id="expense-estimated-value" placeholder="0">
+        <div class="login-note" style="text-align:left; margin-top:6px;">What this would have cost if you'd charged for it normally — even though no cash changed hands, this tracks the real value you're putting into your brand.</div>
       </div>
       <div class="login-field"><label>Date</label><input type="date" id="expense-date"></div>
       <div class="login-field"><label>Link to a project (optional)</label>
@@ -1688,6 +1708,15 @@
       <div style="margin-bottom:14px;"><button class="btn btn-primary" id="add-expense-btn">+ Add Expense</button></div>
       <div class="card" id="expenses-table-card">
         <div class="empty-note">No expenses logged yet — track payments to video directors, session musicians, equipment, software, anything going out.</div>
+      </div>
+
+      <div class="section-title">Sponsorships <span class="sub-cell">Brand exposure — cash, skills, equipment, or a mix</span></div>
+      <div class="grid grid-2" style="margin-bottom:14px;">
+        <div class="card stat-card"><div class="bar"></div><div class="label">Cash given</div><div class="value sensitive" id="fin-sponsor-cash">TSh 0</div></div>
+        <div class="card stat-card"><div class="bar"></div><div class="label">Total value contributed</div><div class="value sensitive" id="fin-sponsor-total-value">TSh 0</div></div>
+      </div>
+      <div class="card" id="sponsorships-table-card">
+        <div class="empty-note">No sponsorships logged yet.</div>
       </div>
 
       <div class="section-title">Cancelled / lost work</div>
@@ -3115,15 +3144,18 @@
     const list = data || [];
     expensesCache = list;
 
-    const totalExpenses = list.reduce((s,e)=>s+Number(e.amount||0),0);
+    const operational = list.filter(e => !e.is_sponsorship);
+    const sponsorships = list.filter(e => e.is_sponsorship);
+
+    const totalExpenses = operational.reduce((s,e)=>s+Number(e.amount||0),0);
     document.getElementById('fin-expenses-total').textContent = money(totalExpenses);
 
     const card = document.getElementById('expenses-table-card');
     if (card){
-      card.innerHTML = list.length
+      card.innerHTML = operational.length
         ? `<table>
             <tr><th>Description</th><th>Category</th><th>Project</th><th>Date</th><th>Amount</th></tr>
-            ${list.map(e => `
+            ${operational.map(e => `
               <tr class="rowhover" data-expense-id="${e.id}" style="cursor:pointer;">
                 <td class="name-cell">${e.description}</td>
                 <td>${e.category || '—'}</td>
@@ -3137,6 +3169,36 @@
         el.addEventListener('click', ()=> openExpenseForEdit(el.dataset.expenseId));
       });
     }
+
+    const contributionLabel = { cash: 'Cash', skills: 'Skills/time', equipment: 'Equipment', mixed: 'Mixed' };
+    const sponsorCash = sponsorships.reduce((s,e)=>s+Number(e.amount||0),0);
+    const sponsorTotalValue = sponsorships.reduce((s,e)=>s+Number(e.amount||0)+Number(e.estimated_value||0),0);
+    const sponsorCashEl = document.getElementById('fin-sponsor-cash');
+    const sponsorTotalEl = document.getElementById('fin-sponsor-total-value');
+    if (sponsorCashEl) sponsorCashEl.textContent = money(sponsorCash);
+    if (sponsorTotalEl) sponsorTotalEl.textContent = money(sponsorTotalValue);
+
+    const sponsorCard = document.getElementById('sponsorships-table-card');
+    if (sponsorCard){
+      sponsorCard.innerHTML = sponsorships.length
+        ? `<table>
+            <tr><th>Event</th><th>What was given</th><th>Contribution</th><th>Date</th><th>Cash</th><th>Est. value</th></tr>
+            ${sponsorships.map(e => `
+              <tr class="rowhover" data-expense-id="${e.id}" style="cursor:pointer;">
+                <td class="name-cell">${e.event_name || '—'}</td>
+                <td class="sub-cell">${e.description}</td>
+                <td><span class="tag-flag studio">${contributionLabel[e.contribution_type] || 'Cash'}</span></td>
+                <td class="sub-cell">${e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '—'}</td>
+                <td class="sensitive">${money(e.amount)}</td>
+                <td class="sensitive">${money(e.estimated_value)}</td>
+              </tr>`).join('')}
+          </table>`
+        : '<div class="empty-note">No sponsorships logged yet.</div>';
+      sponsorCard.querySelectorAll('tr[data-expense-id]').forEach(el=>{
+        el.addEventListener('click', ()=> openExpenseForEdit(el.dataset.expenseId));
+      });
+    }
+
     updateLabelNet();
   }
 
@@ -3147,18 +3209,32 @@
       projectsCache.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
   }
 
+  function toggleSponsorshipFields(){
+    const isSponsorship = document.getElementById('expense-is-sponsorship').checked;
+    document.getElementById('expense-event-name-wrap').style.display = isSponsorship ? '' : 'none';
+    document.getElementById('expense-contribution-type-wrap').style.display = isSponsorship ? '' : 'none';
+    document.getElementById('expense-estimated-value-wrap').style.display = isSponsorship ? '' : 'none';
+    document.getElementById('expense-description-label').textContent = isSponsorship ? 'What was this for' : 'Description';
+    document.getElementById('expense-amount-label').textContent = isSponsorship ? 'Cash given, if any (TSh)' : 'Amount (TSh)';
+    document.getElementById('expense-modal-title').textContent = editingExpenseId
+      ? (isSponsorship ? 'Edit Sponsorship' : 'Edit Expense')
+      : (isSponsorship ? 'Add Sponsorship' : 'Add Expense');
+  }
+  document.getElementById('expense-is-sponsorship').addEventListener('change', toggleSponsorshipFields);
+
   function resetExpenseModal(){
     editingExpenseId = null;
     document.getElementById('expense-modal-title').textContent = 'Add Expense';
     document.getElementById('expense-delete').style.display = 'none';
     document.getElementById('expense-form').reset();
+    document.getElementById('expense-is-sponsorship').checked = false;
+    toggleSponsorshipFields();
   }
   function openExpenseForEdit(id){
     const e = expensesCache.find(x => x.id === id);
     if (!e) return;
     editingExpenseId = id;
     populateExpenseProjectSelect();
-    document.getElementById('expense-modal-title').textContent = 'Edit Expense';
     document.getElementById('expense-delete').style.display = '';
     document.getElementById('expense-description').value = e.description || '';
     document.getElementById('expense-category').value = e.category || '';
@@ -3166,6 +3242,11 @@
     document.getElementById('expense-date').value = e.expense_date || '';
     document.getElementById('expense-project').value = e.project_id || '';
     document.getElementById('expense-notes').value = e.notes || '';
+    document.getElementById('expense-is-sponsorship').checked = !!e.is_sponsorship;
+    document.getElementById('expense-event-name').value = e.event_name || '';
+    document.getElementById('expense-contribution-type').value = e.contribution_type || 'cash';
+    document.getElementById('expense-estimated-value').value = e.estimated_value || 0;
+    toggleSponsorshipFields();
     document.getElementById('expense-modal-scrim').classList.add('show');
   }
 
@@ -4088,6 +4169,7 @@
     e.preventDefault();
     const btn = document.getElementById('expense-submit');
     btn.disabled = true; btn.textContent = 'Saving…';
+    const isSponsorship = document.getElementById('expense-is-sponsorship').checked;
     const payload = {
       description: document.getElementById('expense-description').value.trim(),
       category: document.getElementById('expense-category').value.trim(),
@@ -4095,6 +4177,10 @@
       expense_date: document.getElementById('expense-date').value || null,
       project_id: document.getElementById('expense-project').value || null,
       notes: document.getElementById('expense-notes').value.trim(),
+      is_sponsorship: isSponsorship,
+      event_name: isSponsorship ? document.getElementById('expense-event-name').value.trim() : null,
+      contribution_type: isSponsorship ? document.getElementById('expense-contribution-type').value : null,
+      estimated_value: isSponsorship ? Number(document.getElementById('expense-estimated-value').value || 0) : 0,
     };
     const { error } = editingExpenseId
       ? await supabaseClient.from('expenses').update(payload).eq('id', editingExpenseId)
